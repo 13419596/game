@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+.bin
+odin_game.code-workspace
+.bin.dSYM
+tests/*.csv
+*.bak
+*.bin
+*.swp
