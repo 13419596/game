@@ -2,8 +2,7 @@ package container_set
 
 @(private, require_results)
 getUnique_slice :: proc(arr: []$T) -> [dynamic]T {
-  tmp_set := fromArray(arr)
-  defer deleteSet(&tmp_set)
+  tmp_set := fromArray(arr = arr, allocator = context.temp_allocator)
   return asArray(&tmp_set)
 }
 

@@ -337,7 +337,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.allocat
   defer if !ok {bytes_parsed = 0}
   bytes_parsed = 0
   out.set_negated = false
-  out.charset = makeSet(T = rune, allocator = allocator)
+  out.charset = makeSet(T = rune, cap = 1, allocator = allocator)
   pos_shorthands: bit_set[ShortHandClass] = {}
   neg_shorthands: bit_set[ShortHandClass] = {}
   if len(unparsed_runes) <= bytes_parsed || unparsed_runes[bytes_parsed] == ']' {

@@ -9,9 +9,9 @@ Set :: struct($T: typeid) {
 }
 
 @(require_results)
-makeSet :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> Set(T) {
+makeSet :: proc($T: typeid, cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> Set(T) {
   out := Set(T) {
-    set = make(map[T]any, DEFAULT_RESERVE_CAPACITY, allocator, loc),
+    set = make(map[T]any, max(1, cap), allocator, loc),
   }
   return out
 }

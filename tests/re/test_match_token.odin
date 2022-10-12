@@ -136,7 +136,7 @@ test_parseLatterEscapedRune :: proc(t: ^testing.T) {
 
 @(private = "file")
 makeSetToken :: proc(
-  set_chars: string="",
+  set_chars: string = "",
   set_negated: bool = false,
   pos_sh: bit_set[re.ShortHandClass] = {},
   neg_sh: bit_set[re.ShortHandClass] = {},
