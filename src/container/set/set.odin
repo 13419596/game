@@ -1,36 +1,41 @@
 package container_set
 
+@(private = "file")
+DEFAULT_RESERVE_CAPACITY :: 16
+
 Set :: struct($T: typeid) {
   // no built-in set type, so use a map instead
   set: map[T]any,
 }
 
 @(require_results)
-makeSet :: proc($T: typeid) -> Set(T) {
+makeSet :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> Set(T) {
   out := Set(T) {
-    set = make(map[T]any),
+    set = make(map[T]any, DEFAULT_RESERVE_CAPACITY, allocator, loc),
   }
   return out
 }
 
 deleteSet :: proc(set: ^$S/Set($T)) {
-  delete(set.set)
-  set.set = nil
+  if set.set != nil {
+    delete(set.set)
+    set.set = nil
+  }
 }
 
 //////////////////////////////////////////////
 
 @(private, require_results)
-fromArray_slice :: proc(arr: $A/[]$T) -> Set(T) {
-  set := makeSet(T)
-  update(&set, arr)
-  return set
+fromArray_slice :: proc(arr: $A/[]$T, allocator := context.allocator) -> Set(T) {
+  out := makeSet(T = T, allocator = allocator)
+  update(&out, arr)
+  return out
 }
 
 @(private, require_results)
-fromArray_array :: proc(arr: $A/[$N]$T) -> Set(T) {
+fromArray_array :: proc(arr: $A/[$N]$T, allocator := context.allocator) -> Set(T) {
   arr := arr // make addressable
-  return fromArray_slice(arr[:])
+  return fromArray_slice(arr = arr[:], allocator = allocator)
 }
 
 @(require_results)
@@ -46,8 +51,8 @@ reset :: proc(self: ^$S/Set($T)) {
 }
 
 @(require_results)
-copy :: proc(self: ^$S/Set($T)) -> Set(T) {
-  out := makeSet(T)
+copy :: proc(self: ^$S/Set($T), allocator := context.allocator) -> Set(T) {
+  out := makeSet(T = T, allocator = context.allocator)
   reserve(&out.set, len(self.set))
   for item, val in self.set {
     out.set[item] = val
@@ -56,8 +61,8 @@ copy :: proc(self: ^$S/Set($T)) -> Set(T) {
 }
 
 @(require_results)
-asArray :: proc(self: ^$S/Set($T)) -> [dynamic]T {
-  out := make([dynamic]T, 0, len(self.set))
+asArray :: proc(self: ^$S/Set($T), allocator := context.allocator, loc := #caller_location) -> [dynamic]T {
+  out := make([dynamic]T, 0, len(self.set), context.allocator, loc)
   for item, _ in self.set {
     append(&out, item)
   }
@@ -197,17 +202,15 @@ issuperset_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S1/Set(T)) -> bool {
 @(private)
 issuperset_slice_slice :: proc(lhs, rhs: $A/[]$T) -> bool {
   // Evaluates: lhs ⊇ rhs
-  lhs_set := fromArray(lhs) // Convert first to set
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator) // Convert first to set
   return issuperset(&lhs_set, rhs)
 }
 
 @(private)
 issuperset_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> bool {
   // Evaluates: lhs ⊇ rhs
-  lhs_set := fromArray(lhs)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   rhs := rhs // make addressable
-  defer deleteSet(&lhs_set) // Convert first to set
   return issuperset(&lhs_set, rhs[:])
 }
 
@@ -215,8 +218,7 @@ issuperset_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> bool {
 issuperset_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> bool {
   // Evaluates: lhs ⊇ rhs
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:]) // Convert first to set
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator) // Convert first to set
   return issuperset(&lhs_set, rhs)
 }
 
@@ -224,9 +226,8 @@ issuperset_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> bool {
 issuperset_array_array :: proc(lhs: $A1/[$N]$T, rhs: $A2/[$M]T) -> bool {
   // Evaluates: lhs ⊇ rhs
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:]) // Convert first to set
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator) // Convert first to set
   rhs := rhs // make addressable
-  defer deleteSet(&lhs_set)
   return issuperset(&lhs_set, rhs[:])
 }
 
@@ -268,8 +269,7 @@ issubset_set_slice :: proc(lhs: ^$S1/Set($T), rhs: $A/[]T) -> bool {
     return false
   }
   // convert rhs to set, so membership function is available
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return issubset(lhs, &rhs_set)
 }
 
@@ -295,17 +295,15 @@ issubset_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S1/Set(T)) -> bool {
 @(private)
 issubset_slice_slice :: proc(lhs, rhs: $A/[]$T) -> bool {
   // Evaluates: lhs ⊆ rhs
-  lhs_set := fromArray(lhs) // Convert first to set
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator) // Convert first to set
   return issubset(&lhs_set, rhs)
 }
 
 @(private)
 issubset_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> bool {
   // Evaluates: lhs ⊆ rhs
-  lhs_set := fromArray(lhs)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   rhs := rhs // make addressable
-  defer deleteSet(&lhs_set) // Convert first to set
   return issubset(&lhs_set, rhs[:])
 }
 
@@ -313,8 +311,7 @@ issubset_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> bool {
 issubset_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> bool {
   // Evaluates: lhs ⊆ rhs
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:]) // Convert first to set
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator) // Convert first to set
   return issubset(&lhs_set, rhs)
 }
 
@@ -322,9 +319,8 @@ issubset_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> bool {
 issubset_array_array :: proc(lhs: $A1/[$N]$T, rhs: $A2/[$M]T) -> bool {
   // Evaluates: lhs ⊆ rhs
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:]) // Convert first to set
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator) // Convert first to set
   rhs := rhs // make addressable
-  defer deleteSet(&lhs_set)
   return issubset(&lhs_set, rhs[:])
 }
 
@@ -359,71 +355,59 @@ isequal_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> bool {
 
 @(private)
 isequal_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T) -> bool {
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isequal(lhs, &rhs_set)
 }
 
 @(private)
 isequal_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T) -> bool {
   rhs := rhs // make addressable
-  rhs_set := fromArray(rhs[:])
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs[:], allocator = context.temp_allocator)
   return isequal(lhs, &rhs_set)
 }
 
 @(private)
 isequal_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S/Set(T)) -> bool {
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   return isequal(&lhs_set, rhs)
 }
 
 @(private)
 isequal_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S/Set(T)) -> bool {
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:])
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator)
   return isequal(&lhs_set, rhs)
 }
 
 @(private)
 isequal_slice_slice :: proc(lhs, rhs: $A/[]$T) -> bool {
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isequal(&lhs_set, &rhs_set)
 }
 
 @(private)
 isequal_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> bool {
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   rhs := rhs // make addressable
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isequal(&lhs_set, &rhs_set)
 }
 
 @(private)
 isequal_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> bool {
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isequal(&lhs_set, &rhs_set)
 }
 
 @(private)
 isequal_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T) -> bool {
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   rhs := rhs // make addressable
-  rhs_set := fromArray(rhs[:])
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs[:], allocator = context.temp_allocator)
   return isequal(&lhs_set, &rhs_set)
 }
 
@@ -459,71 +443,59 @@ isdisjoint_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> bool {
 
 @(private)
 isdisjoint_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T) -> bool {
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isdisjoint(lhs, &rhs_set)
 }
 
 @(private)
 isdisjoint_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T) -> bool {
   rhs := rhs // make addressable
-  rhs_set := fromArray(rhs[:])
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs[:], allocator = context.temp_allocator)
   return isdisjoint(lhs, &rhs_set)
 }
 
 @(private)
 isdisjoint_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S/Set(T)) -> bool {
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   return isdisjoint(&lhs_set, rhs)
 }
 
 @(private)
 isdisjoint_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S/Set(T)) -> bool {
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:])
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator)
   return isdisjoint(&lhs_set, rhs)
 }
 
 @(private)
 isdisjoint_slice_slice :: proc(lhs, rhs: $A/[]$T) -> bool {
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isdisjoint(&lhs_set, &rhs_set)
 }
 
 @(private)
 isdisjoint_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> bool {
-  lhs_set := fromArray(lhs)
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs, allocator = context.temp_allocator)
   rhs := rhs // make addressable
-  rhs_set := fromArray(rhs[:])
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs[:], allocator = context.temp_allocator)
   return isdisjoint(&lhs_set, &rhs_set)
 }
 
 @(private)
 isdisjoint_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> bool {
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:])
-  defer deleteSet(&lhs_set)
-  rhs_set := fromArray(rhs)
-  defer deleteSet(&rhs_set)
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator)
+  rhs_set := fromArray(arr = rhs, allocator = context.temp_allocator)
   return isdisjoint(&lhs_set, &rhs_set)
 }
 
 @(private)
 isdisjoint_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T) -> bool {
   lhs := lhs // make addressable
-  lhs_set := fromArray(lhs[:])
-  defer deleteSet(&lhs_set)
+  lhs_set := fromArray(arr = lhs[:], allocator = context.temp_allocator)
   rhs := rhs // make addressable
-  rhs_set := fromArray(rhs[:])
-  defer deleteSet(&rhs_set)
+  rhs_set := fromArray(arr = rhs[:], allocator = context.temp_allocator)
   return isdisjoint(&lhs_set, &rhs_set)
 }
 
@@ -574,48 +546,48 @@ difference_update :: proc {// lhs -= rhs
 //////////////////////////////////////////////
 
 @(private, require_results)
-difference_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> Set(T) {
+difference_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-difference_set_slice :: proc(lhs: ^$S/Set($T), rhs: []T) -> Set(T) {
+difference_set_slice :: proc(lhs: ^$S/Set($T), rhs: []T, allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-difference_set_array :: proc(lhs: ^$S/Set($T), rhs: [$N]T) -> Set(T) {
+difference_set_array :: proc(lhs: ^$S/Set($T), rhs: [$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   rhs := rhs // make addressable
   difference_update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-difference_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S/Set(T)) -> Set(T) {
+difference_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-difference_slice_slice :: proc(lhs, rhs: $A/[]$T) -> Set(T) {
+difference_slice_slice :: proc(lhs, rhs: $A/[]$T, allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-difference_slice_array :: proc(lhs: $A/[]$T, rhs: [$N]T) -> Set(T) {
+difference_slice_array :: proc(lhs: $A/[]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
   out := fromArray(lhs)
   rhs := rhs // make addressable
@@ -624,28 +596,28 @@ difference_slice_array :: proc(lhs: $A/[]$T, rhs: [$N]T) -> Set(T) {
 }
 
 @(private, require_results)
-difference_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S/Set(T)) -> Set(T) {
+difference_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-difference_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> Set(T) {
+difference_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-difference_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T) -> Set(T) {
+difference_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs - rhs
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   rhs := rhs // make addressable
   difference_update(&out, rhs[:])
   return out
@@ -667,15 +639,14 @@ difference :: proc {// out = lhs - rhs
 //////////////////////////////////////////////
 
 @(private)
-intersection_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T)) {
+intersection_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T), allocator := context.allocator) {
   // lhs &= rhs
   for item, _ in other.set {
     if !(item in self.set) {
       discard(self, item)
     }
   }
-  items_to_delete := makeSet(T)
-  defer deleteSet(&items_to_delete)
+  items_to_delete := makeSet(T = T, allocator = context.temp_allocator)
   for item, _ in self.set {
     if !(item in other.set) {
       items_to_delete.set[item] = nil // add item
@@ -689,8 +660,7 @@ intersection_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T)) {
 @(private)
 intersection_update_slice :: proc(self: ^$S/Set($T), items: $A/[]T) {
   // lhs &= rhs
-  other := fromArray(items)
-  defer deleteSet(&other)
+  other := fromArray(arr = items, allocator = context.temp_allocator)
   intersection_update(self, &other)
 }
 
@@ -698,8 +668,7 @@ intersection_update_slice :: proc(self: ^$S/Set($T), items: $A/[]T) {
 intersection_update_array :: proc(self: ^$S/Set($T), items: $A/[$N]T) {
   // lhs &= rhs
   items := items // make addressable
-  other := fromArray(items[:])
-  defer deleteSet(&other)
+  other := fromArray(arr = items[:], allocator = context.temp_allocator)
   intersection_update(self, &other)
 }
 
@@ -712,78 +681,78 @@ intersection_update :: proc {// lhs &= rhs
 //////////////////////////////////////////////
 
 @(private, require_results)
-intersection_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> Set(T) {
+intersection_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   intersection_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-intersection_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T) -> Set(T) {
+intersection_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   intersection_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-intersection_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T) -> Set(T) {
+intersection_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   rhs := rhs // make addressable
   intersection_update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-intersection_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S2/Set(T)) -> Set(T) {
+intersection_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   intersection_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-intersection_slice_slice :: proc(lhs, rhs: $A/[]$T) -> Set(T) {
+intersection_slice_slice :: proc(lhs, rhs: $A/[]$T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   intersection_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-intersection_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> Set(T) {
+intersection_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   rhs := rhs // make addressable
   intersection_update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-intersection_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S2/Set(T)) -> Set(T) {
+intersection_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   intersection_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-intersection_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> Set(T) {
+intersection_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   intersection_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-intersection_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T) -> Set(T) {
+intersection_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∩ rhs
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   rhs := rhs // make addressable
   intersection_update(&out, rhs[:])
   return out
@@ -806,78 +775,78 @@ intersection :: proc {// out = lhs ∩ rhs
 // note: union is a reserved word, what would be `union` is declared as `conjunction` instead
 
 @(private, require_results)
-conjunction_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> Set(T) {
+conjunction_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-conjunction_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T) -> Set(T) {
+conjunction_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-conjunction_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T) -> Set(T) {
+conjunction_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   rhs := rhs // make addressable
   update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-conjunction_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S2/Set(T)) -> Set(T) {
+conjunction_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-conjunction_slice_slice :: proc(lhs, rhs: $A/[]$T) -> Set(T) {
+conjunction_slice_slice :: proc(lhs, rhs: $A/[]$T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-conjunction_slice_array :: proc(lhs: $A/[]$T, rhs: [$N]T) -> Set(T) {
+conjunction_slice_array :: proc(lhs: $A/[]$T, rhs: [$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   rhs := rhs // make addressable
   update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-conjunction_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S2/Set(T)) -> Set(T) {
+conjunction_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-conjunction_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> Set(T) {
+conjunction_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
   lhs := lhs // make addressable
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-conjunction_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T) -> Set(T) {
+conjunction_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs ∪ set
   lhs := lhs // make addressable
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   rhs := rhs // make addressable
   update(&out, rhs[:])
   return out
@@ -902,8 +871,7 @@ conjunction :: proc {// out = lhs ∪ set
 symmetric_difference_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T)) {
   // lhs △= rhs
   // lhs = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  inter := intersection(self, other)
-  defer deleteSet(&inter)
+  inter := intersection(self, other, context.temp_allocator)
   for item, _ in other.set {
     if !(item in inter.set) {
       self.set[item] = nil // add item
@@ -918,8 +886,7 @@ symmetric_difference_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T)) 
 symmetric_difference_update_slice :: proc(self: ^$S/Set($T), items: $A/[]T) {
   // lhs △= rhs
   // lhs = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  other := fromArray(items)
-  defer deleteSet(&other)
+  other := fromArray(arr = items, allocator = context.temp_allocator)
   symmetric_difference_update(self, &other)
 }
 
@@ -928,8 +895,7 @@ symmetric_difference_update_array :: proc(self: ^$S/Set($T), items: $A/[$N]T) {
   // lhs △= rhs
   // lhs = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
   items := items // make addressable
-  other := fromArray(items[:])
-  defer deleteSet(&other)
+  other := fromArray(arr = items[:], allocator = context.temp_allocator)
   symmetric_difference_update(self, &other)
 }
 
@@ -943,87 +909,87 @@ symmetric_difference_update :: proc {// lhs △= rhs
 //////////////////////////////////////////////
 
 @(private, require_results)
-symmetric_difference_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> Set(T) {
+symmetric_difference_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   symmetric_difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-symmetric_difference_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T) -> Set(T) {
+symmetric_difference_set_slice :: proc(lhs: ^$S/Set($T), rhs: $A/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   symmetric_difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-symmetric_difference_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T) -> Set(T) {
+symmetric_difference_set_array :: proc(lhs: ^$S/Set($T), rhs: $A/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  out := copy(lhs)
+  out := copy(self = lhs, allocator = allocator)
   rhs := rhs // make addressable
   symmetric_difference_update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-symmetric_difference_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S2/Set(T)) -> Set(T) {
+symmetric_difference_slice_set :: proc(lhs: $A/[]$T, rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   symmetric_difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-symmetric_difference_slice_slice :: proc(lhs, rhs: $A/[]$T) -> Set(T) {
+symmetric_difference_slice_slice :: proc(lhs, rhs: $A/[]$T, allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   symmetric_difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-symmetric_difference_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T) -> Set(T) {
+symmetric_difference_slice_array :: proc(lhs: $A1/[]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
-  out := fromArray(lhs)
+  out := fromArray(arr = lhs, allocator = allocator)
   rhs := rhs // make addressable
   symmetric_difference_update(&out, rhs[:])
   return out
 }
 
 @(private, require_results)
-symmetric_difference_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S2/Set(T)) -> Set(T) {
+symmetric_difference_array_set :: proc(lhs: $A/[$N]$T, rhs: ^$S2/Set(T), allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   symmetric_difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-symmetric_difference_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T) -> Set(T) {
+symmetric_difference_array_slice :: proc(lhs: $A1/[$N]$T, rhs: $A2/[]T, allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   symmetric_difference_update(&out, rhs)
   return out
 }
 
 @(private, require_results)
-symmetric_difference_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T) -> Set(T) {
+symmetric_difference_array_array :: proc(lhs: $A1/[$M]$T, rhs: $A2/[$N]T, allocator := context.allocator) -> Set(T) {
   // out = lhs △ rhs
   // out = (lhs - rhs) ∪ (rhs - lhs) = (lhs ∪ rhs) - (lhs ∩ rhs)
   lhs := lhs // make addressable
-  out := fromArray(lhs[:])
+  out := fromArray(arr = lhs[:], allocator = allocator)
   rhs := rhs // make addressable
   symmetric_difference_update(&out, rhs[:])
   return out
