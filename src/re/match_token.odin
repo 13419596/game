@@ -334,14 +334,14 @@ parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok: 
 }
 
 
-parseLatterSetToken :: proc(unparsed_runes: string) -> (out: SetToken, bytes_parsed: int, ok: bool) {
+parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator) -> (out: SetToken, bytes_parsed: int, ok: bool) {
   // starts parsing from first [
   using container_set
   ok = true
   defer if !ok { bytes_parsed = 0 }
   bytes_parsed = 0
   out.set_negated = false
-  out.charset = makeSet(rune)
+  out.charset = makeSet(T=rune, allocator=allocator)
   pos_shorthands: bit_set[ShortHandClass] = {}
   neg_shorthands: bit_set[ShortHandClass] = {}
   if len(unparsed_runes) <= bytes_parsed || unparsed_runes[bytes_parsed] == ']' {
@@ -493,7 +493,7 @@ parseLatterSetToken :: proc(unparsed_runes: string) -> (out: SetToken, bytes_par
   return
 }
 
-parseLatterGroupBeginToken :: proc(unparsed_runes: string) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
+parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator:=context.allocator) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
   // starts parsing after first (
   bytes_parsed = 0
   ok = true
@@ -553,11 +553,11 @@ parseLatterGroupBeginToken :: proc(unparsed_runes: string) -> (out: GroupBeginTo
     return
   }
   bytes_parsed += name_width
-  out.mname = strings.clone(unparsed_runes[name_start_index:name_start_index + name_width])
+  out.mname = strings.clone(unparsed_runes[name_start_index:name_start_index + name_width], allocator)
   return
 }
 
-makeTokenFromString :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed: int, ok: bool) {
+makeTokenFromString :: proc(unparsed_runes: string, allocator:=context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
   using container_set
   defer if !ok { bytes_parsed = 0 }
   bytes_parsed = 0
@@ -567,7 +567,7 @@ makeTokenFromString :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed
     bytes_parsed += utf8.rune_size(rn)
     switch rn {
     case '[':
-      out, group_bytes_parsed, ok = parseLatterSetToken(unparsed_runes[bytes_parsed:])
+      out, group_bytes_parsed, ok = parseLatterSetToken(unparsed_runes[bytes_parsed:], allocator)
       bytes_parsed += group_bytes_parsed
       return
     case '\\':
@@ -581,7 +581,7 @@ makeTokenFromString :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed
       bytes_parsed += group_bytes_parsed
       return
     case '(':
-      out, group_bytes_parsed, ok = parseLatterGroupBeginToken(unparsed_runes[bytes_parsed:])
+      out, group_bytes_parsed, ok = parseLatterGroupBeginToken(unparsed_runes[bytes_parsed:], allocator)
       bytes_parsed += group_bytes_parsed
       return
     case '{':
