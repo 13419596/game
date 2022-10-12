@@ -17,6 +17,10 @@ test_match_token :: proc(t: ^testing.T) {
   test_parseLatterSetToken(t)
   test_parseLatterGroupBeginToken(t)
   test_makeTokenFromString(t)
+  test_makeLiteralTokenCaseInsensitive(t)
+  test_makeSetTokenCaseInsensitive(t)
+  test_makeTokenCaseInsensitive(t)
+  test_doesSetTokenMatch(t)
 }
 
 
@@ -132,15 +136,16 @@ test_parseLatterEscapedRune :: proc(t: ^testing.T) {
 
 @(private = "file")
 makeSetToken :: proc(
-  set_chars: string,
+  set_chars: string="",
   set_negated: bool = false,
   pos_sh: bit_set[re.ShortHandClass] = {},
   neg_sh: bit_set[re.ShortHandClass] = {},
+  allocator := context.allocator,
 ) -> re.SetToken {
   using container_set
   using re
   out := SetToken {
-    charset        = makeSet(rune),
+    charset        = makeSet(T = rune, allocator = allocator),
     set_negated    = set_negated,
     pos_shorthands = pos_sh,
     neg_shorthands = neg_sh,
@@ -482,5 +487,268 @@ test_makeTokenFromString :: proc(t: ^testing.T) {
       cmp := isequal_Token(&tok, &expected)
       tc.expect(t, cmp, fmt.tprintf("Pattern:\"%v\" Expected:%v Got:%v", pattern, expected, tok))
     }
+  }
+}
+
+@(test)
+test_makeLiteralTokenCaseInsensitive :: proc(t: ^testing.T) {
+  using re
+  inputs := [?]LiteralToken{LiteralToken{'a'}, LiteralToken{'.'}, LiteralToken{'A'}, LiteralToken{'Ø'}, LiteralToken{'Ä'}}
+  expecteds := [?]LiteralToken{LiteralToken{'a'}, LiteralToken{'.'}, LiteralToken{'a'}, LiteralToken{'ø'}, LiteralToken{'ä'}}
+  for _, idx in inputs {
+    input := &inputs[idx]
+    makeLiteralTokenCaseInsensitive(input)
+    expected := expecteds[idx]
+    tc.expect(t, input^ == expected, fmt.tprintf("Expected:%v Got:%v", expected, input))
+  }
+}
+
+@(test)
+test_makeSetTokenCaseInsensitive :: proc(t: ^testing.T) {
+  using re
+  context.allocator = context.temp_allocator
+  inputs := [?]SetToken{makeSetToken("aaB"), makeSetToken("."), makeSetToken("ABCd0"), makeSetToken("Ø"), makeSetToken("Ä")}
+  expecteds := [?]SetToken{makeSetToken("abAB"), makeSetToken("."), makeSetToken("abcdABCD0"), makeSetToken("øØ"), makeSetToken("äÄ")}
+  for _, idx in inputs {
+    input := &inputs[idx]
+    makeSetTokenCaseInsensitive(input)
+    expected := expecteds[idx]
+    cmp := isequal_SetToken(input, &expected)
+    tc.expect(t, cmp, fmt.tprintf("Expected:%v Got:%v", expected, input))
+  }
+}
+
+@(test)
+test_makeTokenCaseInsensitive :: proc(t: ^testing.T) {
+  using re
+  inputs := [?]Token{
+    LiteralToken{'a'},
+    LiteralToken{'.'},
+    LiteralToken{'A'},
+    LiteralToken{'Ø'},
+    LiteralToken{'Ä'},
+    makeSetToken("aaB"),
+    makeSetToken("."),
+    makeSetToken("ABCd0"),
+    makeSetToken("Ø"),
+    makeSetToken("Ä"),
+  }
+  expecteds := [?]Token{
+    LiteralToken{'a'},
+    LiteralToken{'.'},
+    LiteralToken{'a'},
+    LiteralToken{'ø'},
+    LiteralToken{'ä'},
+    makeSetToken("abAB"),
+    makeSetToken("."),
+    makeSetToken("abcdABCD0"),
+    makeSetToken("øØ"),
+    makeSetToken("äÄ"),
+  }
+  for _, idx in inputs {
+    input := &inputs[idx]
+    makeTokenCaseInsensitive(input)
+    expected := expecteds[idx]
+    cmp := isequal_Token(input, &expected)
+    tc.expect(t, cmp, fmt.tprintf("Expected:%v Got:%v", expected, input))
+  }
+}
+
+@(test)
+test_doesSetTokenMatch :: proc(t: ^testing.T) {
+  using re
+  /*
+    set_token: ^SetToken,
+  curr_rune: rune,
+  prev_rune: rune = {},
+  at_beginning: bool = false,
+  at_end: bool = false,
+  flags: RegexFlags = {},
+  */
+  {
+    stok := makeSetToken("ab")
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, false, false, false, false, false, false, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  // FLAG W
+  {
+    stok := makeSetToken(set_chars = "ab", pos_sh = {.Flag_W})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, true, true, true, false, false, false, true}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", neg_sh = {.Flag_W})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, false, false, false, true, true, true, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", pos_sh = {.Flag_W}, set_negated = true)
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{false, false, false, false, false, true, true, true, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", neg_sh = {.Flag_W}, set_negated = true)
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{false, false, true, true, true, false, false, false, true}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  // FLAG D
+  {
+    stok := makeSetToken(set_chars = "ab", pos_sh = {.Flag_D})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, false, false, false, false, false, false, true}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", neg_sh = {.Flag_D})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, true, true, true, true, true, true, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", pos_sh = {.Flag_D}, set_negated = true)
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{false, false, true, true, true, true, true, true, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", neg_sh = {.Flag_D}, set_negated = true)
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{false, false, false, false, false, false, false, false, true}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  // FLAG S
+  {
+    stok := makeSetToken(set_chars = "ab", pos_sh = {.Flag_S})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, false, false, false, false, false, true, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", neg_sh = {.Flag_S})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{true, true, true, true, true, true, true, false, true}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", pos_sh = {.Flag_S}, set_negated = true)
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{false, false, true, true, true, true, true, false, true}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(set_chars = "ab", neg_sh = {.Flag_S}, set_negated = true)
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    expecteds := [?]bool{false, false, false, false, false, false, false, true, false}
+    for input, idx in inputs {
+      expected := expecteds[idx]
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+  }
+  {
+    stok := makeSetToken(pos_sh = {.Flag_Dot})
+    inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
+    for input, idx in inputs {
+      expected := true
+      result := doesSetTokenMatch(&stok, input)
+      if result != expected {
+        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+      }
+      tc.expect(t, (result == expected))
+    }
+    tc.expect(t, false == doesSetTokenMatch(&stok, '\n'))
+    tc.expect(t, true == doesSetTokenMatch(set_token = &stok, curr_rune = '\n', flags = {.DOTALL}))
   }
 }

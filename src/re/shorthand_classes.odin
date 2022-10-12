@@ -36,14 +36,14 @@ def getBreakPointsInSequences(points: Sequence[int]) -> Sequence[Tuple[int,int]]
 ##
 
 def writeOdinBreakpointChecks(breakpoints:Sequence[Tuple[int,int]], function_name:str, indent:str='  ', line_prefix:str='', doc_comment:str = '') -> str:
-  out = [f'{function_name} :: proc(token:rune) -> bool {{', ]
+  out = [f'{function_name} :: proc(rn:rune) -> bool {{', ]
   if doc_comment:
     out.append(indent*1 + '// ' + doc_comment)
   ##
   if len(breakpoints)>4:
     out.append(indent*1 + '// TODO optimize check - binary searchspeed up check')
   ##
-  out.append(indent*1 + 'switch u32(token) {')
+  out.append(indent*1 + 'switch u32(rn) {')
   num_breakpoints = len(breakpoints)
   for idx, (lb, rb) in enumerate(breakpoints):
     if lb!=rb:
@@ -93,10 +93,10 @@ for name, pattern in patterns:
 print('\n\n'.join(odin_funcs))
 ```*/
 
-isShorthandWhitespace_utf8 :: proc(token: rune) -> bool {
+isShorthandWhitespace_utf8 :: proc(rn: rune) -> bool {
   // matches whitespace regex "\s"
   // TODO optimize check - binary searchspeed up check
-  switch u32(token) {
+  switch u32(rn) {
   case 9 ..= 13:
     fallthrough
   case 28 ..= 32:
@@ -121,9 +121,9 @@ isShorthandWhitespace_utf8 :: proc(token: rune) -> bool {
   return false
 }
 
-isShorthandWhitespace_ascii :: proc(token: rune) -> bool {
+isShorthandWhitespace_ascii :: proc(rn: rune) -> bool {
   // matches whitespace regex "\s" flag="ASCII"
-  switch u32(token) {
+  switch u32(rn) {
   case 9 ..= 13:
     fallthrough
   case 28 ..= 32:
@@ -132,10 +132,10 @@ isShorthandWhitespace_ascii :: proc(token: rune) -> bool {
   return false
 }
 
-isShorthandWord_utf8 :: proc(token: rune) -> bool {
+isShorthandWord_utf8 :: proc(rn: rune) -> bool {
   // matches word regex "\w"
   // TODO optimize check - binary searchspeed up check
-  switch u32(token) {
+  switch u32(rn) {
   case 48 ..= 57:
     fallthrough
   case 65 ..= 90:
@@ -1554,9 +1554,9 @@ isShorthandWord_utf8 :: proc(token: rune) -> bool {
   return false
 }
 
-isShorthandWord_ascii :: proc(token: rune) -> bool {
+isShorthandWord_ascii :: proc(rn: rune) -> bool {
   // matches word regex "\w" flag="ASCII"
-  switch u32(token) {
+  switch u32(rn) {
   case 48 ..= 57:
     fallthrough
   case 65 ..= 90:
@@ -1569,10 +1569,10 @@ isShorthandWord_ascii :: proc(token: rune) -> bool {
   return false
 }
 
-isShorthandDigit_utf8 :: proc(token: rune) -> bool {
+isShorthandDigit_utf8 :: proc(rn: rune) -> bool {
   // matches Digit regex "\d"
   // TODO optimize check - binary search speed up check
-  switch u32(token) {
+  switch u32(rn) {
   case 48 ..= 57:
     fallthrough
   case 1632 ..= 1641:
@@ -1699,9 +1699,9 @@ isShorthandDigit_utf8 :: proc(token: rune) -> bool {
   return false
 }
 
-isShorthandDigit_ascii :: proc(token: rune) -> bool {
+isShorthandDigit_ascii :: proc(rn: rune) -> bool {
   // matches Digit regex "\d" flag="ASCII"
-  switch u32(token) {
+  switch u32(rn) {
   case 48 ..= 57:
     return true
   }
@@ -1710,43 +1710,43 @@ isShorthandDigit_ascii :: proc(token: rune) -> bool {
 
 /////////////////////////////////
 
-isShorthandWord :: proc(token: rune, ascii: bool = false) -> bool {
-  return ascii ? isShorthandWord_ascii(token) : isShorthandWord_utf8(token)
+isShorthandWord :: proc(rn: rune, ascii: bool = false) -> bool {
+  return ascii ? isShorthandWord_ascii(rn) : isShorthandWord_utf8(rn)
 }
 
-isShorthandWhitespace :: proc(token: rune, ascii: bool = false) -> bool {
-  return ascii ? isShorthandWhitespace_ascii(token) : isShorthandWhitespace_utf8(token)
+isShorthandWhitespace :: proc(rn: rune, ascii: bool = false) -> bool {
+  return ascii ? isShorthandWhitespace_ascii(rn) : isShorthandWhitespace_utf8(rn)
 }
 
-isShorthandDigit :: proc(token: rune, ascii: bool = false) -> bool {
-  return ascii ? isShorthandDigit_ascii(token) : isShorthandDigit_utf8(token)
+isShorthandDigit :: proc(rn: rune, ascii: bool = false) -> bool {
+  return ascii ? isShorthandDigit_ascii(rn) : isShorthandDigit_utf8(rn)
 }
 
 matchesCharacterClass :: proc(
-  token: rune,
+  curr_rune: rune,
   sh_class: ShortHandClass,
-  prev_token: rune = {},
+  prev_rune: rune = {},
   ascii: bool = false,
   at_beginning: bool = false,
   at_end: bool = false,
 ) -> bool {
   switch sh_class {
   case .Flag_W:
-    return isShorthandWord(token = token, ascii = ascii)
+    return isShorthandWord(rn = curr_rune, ascii = ascii)
   case .Flag_D:
-    return isShorthandDigit(token = token, ascii = ascii)
+    return isShorthandDigit(rn = curr_rune, ascii = ascii)
   case .Flag_S:
-    return isShorthandWhitespace(token = token, ascii = ascii)
+    return isShorthandWhitespace(rn = curr_rune, ascii = ascii)
   case .Flag_Dot:
-    return token != '\n'
+    return curr_rune != '\n'
   case .Flag_B:
     if at_beginning || at_end {
       return true
     }
     // not at beginning or end
-    token_is_word := isShorthandWord(token = token, ascii = ascii)
-    prev_token_is_word := isShorthandWord(token = prev_token, ascii = ascii)
-    return token_is_word != prev_token_is_word
+    token_is_word := isShorthandWord(rn = curr_rune, ascii = ascii)
+    prev_rune_is_word := isShorthandWord(rn = prev_rune, ascii = ascii)
+    return token_is_word != prev_rune_is_word
   }
   return false
 }

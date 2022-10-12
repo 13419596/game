@@ -75,7 +75,7 @@ deleteToken :: proc(token: ^Token) {
   case GroupEndToken:
   case QuantityToken:
   case LiteralToken:
-    // do nothing
+  // do nothing
   case GroupBeginToken:
     deleteGroupBeginToken(&tok)
   case SetToken:
@@ -93,11 +93,7 @@ isequal_SetToken :: proc(lhs, rhs: ^SetToken) -> bool {
 }
 
 isequal_GroupBeginToken :: proc(lhs, rhs: ^GroupBeginToken) -> bool {
-  return(
-    (lhs.index == rhs.index) &&
-    (lhs.non_capturing == rhs.non_capturing) &&
-    (lhs.mname== nil && rhs.mname==nil) || (lhs.mname==rhs.mname)
-  )
+  return (lhs.index == rhs.index) && (lhs.non_capturing == rhs.non_capturing) && (lhs.mname == nil && rhs.mname == nil) || (lhs.mname == rhs.mname)
 }
 
 isequal_Token :: proc(lhs, rhs: ^Token) -> bool {
@@ -112,19 +108,19 @@ isequal_Token :: proc(lhs, rhs: ^Token) -> bool {
     }
   case ZeroWidthToken:
     if rtok, ok := rhs.(ZeroWidthToken); ok {
-      return ltok==rtok
+      return ltok == rtok
     }
   case GroupEndToken:
     if rtok, ok := rhs.(GroupEndToken); ok {
-      return ltok==rtok
+      return ltok == rtok
     }
   case LiteralToken:
     if rtok, ok := rhs.(LiteralToken); ok {
-      return ltok==rtok
+      return ltok == rtok
     }
   case QuantityToken:
     if rtok, ok := rhs.(QuantityToken); ok {
-      return ltok==rtok
+      return ltok == rtok
     }
   }
   return false
@@ -133,7 +129,7 @@ isequal_Token :: proc(lhs, rhs: ^Token) -> bool {
 parseLatterQuantityToken :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed: int, ok: bool) {
   // parses starting after the first {
   ok = true
-  defer if !ok { bytes_parsed = 0 }
+  defer if !ok {bytes_parsed = 0}
   if len(unparsed_runes) <= bytes_parsed {
     // just a "{" so a literal {
     out = LiteralToken {
@@ -253,7 +249,7 @@ parseLatterQuantityToken :: proc(unparsed_runes: string) -> (out: Token, bytes_p
 parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok: bool) {
   bytes_parsed = 1
   ok = true
-  defer if !ok { bytes_parsed = 0 }
+  defer if !ok {bytes_parsed = 0}
   lower_rn := unicode.to_lower(rn)
   is_negated := rn != lower_rn // upper are negated
   switch rn {
@@ -329,19 +325,19 @@ parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok: 
     return
   }
   ok = false
-    bytes_parsed = 0
+  bytes_parsed = 0
   return
 }
 
 
-parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator) -> (out: SetToken, bytes_parsed: int, ok: bool) {
+parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: SetToken, bytes_parsed: int, ok: bool) {
   // starts parsing from first [
   using container_set
   ok = true
-  defer if !ok { bytes_parsed = 0 }
+  defer if !ok {bytes_parsed = 0}
   bytes_parsed = 0
   out.set_negated = false
-  out.charset = makeSet(T=rune, allocator=allocator)
+  out.charset = makeSet(T = rune, allocator = allocator)
   pos_shorthands: bit_set[ShortHandClass] = {}
   neg_shorthands: bit_set[ShortHandClass] = {}
   if len(unparsed_runes) <= bytes_parsed || unparsed_runes[bytes_parsed] == ']' {
@@ -368,7 +364,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator
           if u32(rn) < u32(prn) {
             // range is invalid
             ok = false
-    bytes_parsed = 0
+            bytes_parsed = 0
             return
           }
           for v := u32(prn); v <= u32(rn); v += 1 {
@@ -439,7 +435,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator
         case:
           // invalid escape
           ok = false
-    bytes_parsed = 0
+          bytes_parsed = 0
           return
         }
         started_escape = false
@@ -456,7 +452,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator
           if u32(rn) < u32(prn) {
             // range is invalid
             ok = false
-    bytes_parsed = 0
+            bytes_parsed = 0
             return
           }
           for v := u32(prn); v <= u32(rn); v += 1 {
@@ -466,7 +462,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator
         } else {
           // no previous rune / character class, but started range - invalid state
           ok = false
-    bytes_parsed = 0
+          bytes_parsed = 0
           return
         }
         started_range = false
@@ -493,7 +489,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator:=context.allocator
   return
 }
 
-parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator:=context.allocator) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
+parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
   // starts parsing after first (
   bytes_parsed = 0
   ok = true
@@ -542,7 +538,7 @@ parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator:=context.al
     } else if !isShorthandWord_utf8(rn) {
       // only word chararcters allowed in name
       ok = false
-    bytes_parsed = 0
+      bytes_parsed = 0
       return
     }
   }
@@ -557,9 +553,9 @@ parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator:=context.al
   return
 }
 
-makeTokenFromString :: proc(unparsed_runes: string, allocator:=context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
+makeTokenFromString :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
   using container_set
-  defer if !ok { bytes_parsed = 0 }
+  defer if !ok {bytes_parsed = 0}
   bytes_parsed = 0
   group_bytes_parsed := 0
   ok = true
@@ -574,7 +570,7 @@ makeTokenFromString :: proc(unparsed_runes: string, allocator:=context.allocator
       if len(unparsed_runes) <= bytes_parsed {
         // expects more to parse, but at end of string
         ok = false
-    bytes_parsed = 0
+        bytes_parsed = 0
         return
       }
       out, group_bytes_parsed, ok = parseLatterEscapedRune(rune(unparsed_runes[bytes_parsed]))
@@ -641,43 +637,89 @@ makeTokenFromString :: proc(unparsed_runes: string, allocator:=context.allocator
     return
   }
   ok = false
-    bytes_parsed = 0
+  bytes_parsed = 0
   return
 }
 
 
 //////////////////////////////////////
 
-// doesTokenMatch :: proc(
-//   match_token: ^LiteralToken,
-//   token: rune,
-//   prev_token: rune = {},
-//   at_beginning: bool = false,
-//   at_end: bool = false,
-//   flags: RegexFlags = {},
-// ) -> bool {
-//   using container_set
-//   out := false
-//   switch value in &match_token.value {
-//   case rune:
-//     if .IGNORECASE in flags {
-//       out = value == unicode.to_lower(token)
-//     } else {
-//       out = value == token
-//     }
-//   case Set(rune):
-//     if .IGNORECASE in flags {
-//       out = contains(&value, unicode.to_lower(token))
-//     } else {
-//       out = contains(&value, token)
-//     }
-//   case ShortHandClass:
-//     if value == .Flag_Dot && .DOTALL in flags {
-//       out = true
-//     } else {
-//       out = matchesCharacterClass(token = token, prev_token = prev_token, sh_class = value, at_beginning = at_beginning, at_end = at_end)
-//     }
-//   }
-//   return match_token.is_negated ? !out : out
-// }
-// 
+
+makeSetTokenCaseInsensitive :: proc(set_token: ^SetToken) {
+  // it is expected that the number of characters in the set tokens 
+  // will be less than the total of all characters compared, so expanding the
+  // set token to include both pairs will be faster than changing case of all compared strings
+  using container_set
+  using unicode
+  for k, _ in set_token.charset.set {
+    add(&set_token.charset, to_lower(k))
+    add(&set_token.charset, to_upper(k))
+  }
+}
+
+makeLiteralTokenCaseInsensitive :: proc(lit_token: ^LiteralToken) {
+  lit_token.value = unicode.to_lower(lit_token.value)
+}
+
+makeTokenCaseInsensitive :: proc(token: ^Token) {
+  switch tok in token {
+  case LiteralToken:
+    makeLiteralTokenCaseInsensitive(&tok)
+  case SetToken:
+    makeSetTokenCaseInsensitive(&tok)
+  case GroupBeginToken:
+  case GroupEndToken:
+  case ZeroWidthToken:
+  case QuantityToken:
+  // do nothing
+  }
+}
+
+doesSetTokenMatch :: proc(
+  set_token: ^SetToken,
+  curr_rune: rune,
+  prev_rune: rune = {},
+  at_beginning: bool = false,
+  at_end: bool = false,
+  flags: RegexFlags = {},
+) -> bool {
+  // ignores case-insensitive flag
+  // it is assumed that set token has already been transformed to a case-insensitive version
+  using container_set
+  in_charset := contains(&set_token.charset, curr_rune)
+  if in_charset {
+    return !set_token.set_negated
+  }
+  if .Flag_Dot in set_token.pos_shorthands {
+    return .DOTALL in flags ? true : curr_rune != '\n'
+  }
+  is_ascii := .ASCII in flags
+  for shc in ShortHandClass {
+    pos_f := shc in set_token.pos_shorthands
+    neg_f := shc in set_token.neg_shorthands
+    if pos_f == neg_f {
+      if pos_f {
+        // both flags present so either always matches or never
+        return !set_token.set_negated
+      } else {
+        continue
+      }
+    }
+    matches := matchesCharacterClass(
+      curr_rune = curr_rune,
+      prev_rune = prev_rune,
+      sh_class = shc,
+      ascii = is_ascii,
+      at_beginning = at_beginning,
+      at_end = at_beginning,
+    )
+    if (matches && pos_f) || (!matches && neg_f) {
+      return !set_token.set_negated
+    }
+  }
+  // therefore character not in set
+  // so return set_negated value. 
+  // regular/ not negated -> false
+  // inverted / negated   -> true
+  return set_token.set_negated
+}
