@@ -1,15 +1,16 @@
 // Tests "game:regex/infix_to_postfix"
 // Must be run with `-collection:tests=` flag
-package test_regex
+package test_re
 
 import "core:testing"
 import tc "tests:common"
 
 main :: proc() {
   t := testing.T{}
-  tests := [?]proc(_: ^testing.T){runInfixToPostixTests}
-  for test in tests {
-    test(&t)
-  }
+
+  test_shorthand(&t)
+  test_parse(&t)
+  test_match_token(&t)
+
   tc.report(&t)
 }

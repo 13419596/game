@@ -350,7 +350,7 @@ isequal_set_set :: proc(lhs: ^$S1/Set($T), rhs: ^$S2/Set(T)) -> bool {
     return false
   }
   for item, _ in lhs.set {
-    if !(item in rhs.set) {
+    if item not_in rhs.set {
       return false
     }
   }

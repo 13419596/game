@@ -4,6 +4,7 @@ import rl "vendor:raylib"
 import "core:fmt"
 import "core:math"
 import "core:intrinsics"
+import "core:unicode/utf8"
 import "game:re"
 
 SCREEN_WIDTH :: 800
@@ -54,12 +55,85 @@ main :: proc() {
   //   x := RegexFlag.DOTALL
   // }
   {
-    s := string("aÜå😘🫱🏻‍🫲🏾")
-    fmt.printf("%T(%v)  --> %T ; ; len(s)=%v \n", s, s, intrinsics.type_core_type(type_of(s[0])){}, len(s))
-    for ch, i in s {
-      fmt.printf("%v: %T('%v') \n", i, ch, ch)
+    using re
+    n: int
+    ss := [?]string{"12", "0", "444", "+3", "-3", "a", "33a", "--", "00", "09"}
+    for s in ss {
+      value, ok := parseUnprefixedInt(s, &n)
+      fmt.printf("s=\"%v\"; value=%v, ok=%v; n=%v\n", s, value, ok, n)
     }
-    fmt.printf("\n\n")
+  }
+  {
+    using re
+    patterns := [?]string{
+      "^",
+      "$",
+      "|",
+      "?",
+      "+",
+      "*",
+      ".",
+      "\\b",
+      "\\B",
+      "\\d",
+      "\\D",
+      "\\w",
+      "\\W",
+      "\\s",
+      "\\S",
+      "\\{",
+      "\\}",
+      "\\[",
+      "\\]",
+      "\\.",
+      "\\\\",
+      "\\",
+      "{3}",
+      "{3,}",
+      "{,3}",
+      "{3,4}",
+      "{0,0}",
+      "{0,000}",
+      "{,000}",
+      "{000,}",
+      "{1,3}",
+      "{1,3000000}",
+      "a",
+      "AA",
+      "[a]",
+      "[^a]",
+      "[-]",
+      "[^-]",
+      "[abc]",
+      "[a-z]",
+      "[a-z89]",
+      "[a-c89A-C]",
+      "[a-c89A-C-]",
+      "[a-c89A-C-]g",
+      "[a-c89A-C\\d\\w\\s.\\.\\D\\W\\S-]g",
+      "[^-a-c89A-C\\d\\w\\s.\\.\\D\\W\\S-]g",
+      "()",
+      ")",
+      "(?",
+      "(?hello)",
+      "(?:hello)",
+      "(",
+      "{",
+      "{f",
+      "{,",
+      "{,1",
+      "{}f",
+      "{,}",
+      "{0",
+      "{0,",
+      "{0,}",
+      "}",
+    }
+    for pattern in patterns {
+      s, n, ok := makeTokenFromString(pattern)
+      fmt.printf("pattern:\"%v\" s:\"%v\" n:%v  ok:%v\n", pattern, s, n, ok)
+      defer deleteLiteralToken(&s)
+    }
   }
 }
 
