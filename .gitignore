@@ -37,3 +37,4 @@ tests/*.csv
 *.bak
 *.bin
 *.swp
+*.bin.dSYM
