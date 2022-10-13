@@ -67,7 +67,7 @@ _getTokenPriorty :: proc(token: ^Token) -> int {
 }
 
 @(require_results)
-_shouldAddImplicitConcatenation :: proc(prev_token: ^Token, tokens: []Token) -> bool {
+_shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
   for token in tokens {
     switch tok in token {
     case LiteralToken:
@@ -80,7 +80,14 @@ _shouldAddImplicitConcatenation :: proc(prev_token: ^Token, tokens: []Token) -> 
     case GroupEndToken:
       return false
     case OperationToken:
-      return false
+      switch tok.op {
+      case .ALTERNATION:
+        return false
+      case .DOLLAR:
+        return true
+      case .CARET:
+        return true
+      }
     case QuantityToken:
       return false
     case SpecialToken:
@@ -88,11 +95,7 @@ _shouldAddImplicitConcatenation :: proc(prev_token: ^Token, tokens: []Token) -> 
       return false
     }
   }
-  if _, gok := prev_token.(GroupEndToken); gok {
-    return true
-  } else {
-    return false
-  }
+  return false
 }
 
 @(private = "file")
@@ -119,7 +122,7 @@ _addOperator :: proc(self: ^_InfixToPostfixState, token: ^Token) {
 @(private = "file")
 _pushTokenAndPossibleImplicitConcat :: proc(state: ^_InfixToPostfixState, token: ^Token, trailing_infix_tokens: []Token, concat_token: ^Token) {
   append(&state.out_tokens, token)
-  should_add := _shouldAddImplicitConcatenation(token, trailing_infix_tokens)
+  should_add := _shouldAddImplicitConcatenation(trailing_infix_tokens)
   if should_add {
     _addOperator(state, concat_token)
   }
@@ -177,11 +180,9 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
       case .ALTERNATION:
         _addOperator(&state, token)
       case .CARET:
-        // may be correct, not sure
-        _addOperator(&state, token)
+        _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
       case .DOLLAR:
-        // may be correct, not sure
-        _addOperator(&state, token)
+        _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
       }
     case QuantityToken:
       // quantity tokens tightly binds to previous token, so push token to output now.
