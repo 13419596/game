@@ -30,9 +30,9 @@ areTokenArraysEqual :: proc(lhs, rhs: []re.Token) -> bool {
 test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
   using re
   context.allocator = context.temp_allocator
-  patterns := [?]string{"abc", "a(b?)+"}
-  expected_num_infix_tokens := [?]int{3, 6}
-  expected_postfix_tokens := [?][]Token{
+  patterns := [?]string{"abc", "a(b?)+", "[ab]+(?P<name>[cd]?)*e{2,3}"}
+  expected_num_infix_tokens := [?]int{3, 6, 9}
+  all_expected_postfix_tokens := [?][]Token{
     {LiteralToken{'a'}, LiteralToken{'b'}, ZeroWidthToken{.CONCATENATION}, LiteralToken{'c'}, ZeroWidthToken{.CONCATENATION}},
     {
       LiteralToken{'a'},
@@ -43,9 +43,22 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       QuantityToken{1, nil},
       ZeroWidthToken{.CONCATENATION},
     },
+    {
+      makeSetToken("ab"),
+      QuantityToken{1, nil},
+      GroupBeginToken{index = 0, mname = "name"},
+      makeSetToken("cd"),
+      QuantityToken{0, 1},
+      GroupEndToken{index = 0},
+      QuantityToken{0, nil},
+      ZeroWidthToken{.CONCATENATION},
+      LiteralToken{'e'},
+      QuantityToken{2, 3},
+      ZeroWidthToken{.CONCATENATION},
+    },
   }
   tc.expect(t, len(patterns) == len(expected_num_infix_tokens), "Expected num patterns to be equal to num expected infix lengths")
-  tc.expect(t, len(patterns) == len(expected_postfix_tokens), "Expected num patterns to be equal to num expected postfix patterns")
+  tc.expect(t, len(patterns) == len(all_expected_postfix_tokens), "Expected num patterns to be equal to num expected postfix patterns")
   for pattern, idx in patterns {
     if verbose {
       fmt.printf("Pattern: \"%v\"\n", pattern)
@@ -65,15 +78,26 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       }
     }
     postfix_tokens, postfix_ok := convertInfixToPostfix(infix_tokens[:])
+    expected_postfix_tokens := all_expected_postfix_tokens[idx]
     defer deleteTokens(&postfix_tokens)
     if verbose {
       fmt.printf("\nPostfix Tokens:\n")
-      for token, idx in postfix_tokens {
-        fmt.printf(" % 2d: %v\n", idx, token)
+      for _, idx in 0 ..< max(len(postfix_tokens), len(expected_postfix_tokens)) {
+        fmt.printf("% 2d: \n", idx)
+        if idx < len(postfix_tokens) {
+          fmt.printf("| %v\n", postfix_tokens[idx])
+        } else {
+          fmt.printf("| missing\n")
+        }
+        if idx < len(expected_postfix_tokens) {
+          fmt.printf("| %v\n", expected_postfix_tokens[idx])
+        } else {
+          fmt.printf("| missing\n")
+        }
       }
       fmt.printf("\n")
     }
-    cmp := areTokenArraysEqual(postfix_tokens[:], expected_postfix_tokens[idx][:])
-    tc.expect(t, cmp)
+    cmp := areTokenArraysEqual(postfix_tokens[:], expected_postfix_tokens[:])
+    tc.expect(t, cmp, "Postfix operators were not the same as expected")
   }
 }
