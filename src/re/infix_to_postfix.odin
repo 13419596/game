@@ -169,6 +169,9 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
         append(&state.out_tokens, &concat_token)
         append(&state.out_tokens, token)
         append(&state.out_tokens, &concat_token)
+        if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
+          _addOperator(&state, &concat_token)
+        }
         if !retrieved_begin {
           // "Unbalanced parenthesis in expression. Cannot compute postfix expression.";
           ok = false
