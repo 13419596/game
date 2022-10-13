@@ -531,7 +531,7 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
   pout := &out
   // TODO handle other regex flags
   case_insensitive := .IGNORECASE in flags
-  prev_token_is_quantifier := true // cannot add two quantifiers in a row
+  prev_token: Token = nil
   head_idx := 0
   group_index := 0
   group_index_stack := make([dynamic]int, context.temp_allocator)
@@ -540,7 +540,7 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
     token, bytes_parsed, token_ok := parseSingleTokenFromString(s[head_idx:])
     if !token_ok {
       ok = false
-      return
+      break loop
     }
     head_idx += bytes_parsed
 
@@ -581,16 +581,33 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
     // do nothing
     }
 
-    // Check that quantifier doesn't follow quantifier
-    if _, q_ok := token.(QuantityToken); q_ok {
-      if prev_token_is_quantifier {
+    // Check that quantifier can't quantifier, group begin, or op
+    if _, qok := token.(QuantityToken); qok {
+      // current is Qtoken
+      if prev_token == nil {
+        // cannot have quantifier right at the beginning, 
         ok = false
+        break loop
+      } else {
+        switch in prev_token {
+        case QuantityToken:
+          ok = false
+          break loop
+        case OperationToken:
+          ok = false
+          break loop
+        case GroupBeginToken:
+          ok = false
+          break loop
+        case SpecialToken:
+        case LiteralToken:
+        case SetToken:
+        case GroupEndToken:
+        }
       }
-      prev_token_is_quantifier = true
-    } else {
-      prev_token_is_quantifier = false
     }
     append(&out, token)
+    prev_token = token
   }
   if len(group_index_stack) != 0 {
     // unbalanced

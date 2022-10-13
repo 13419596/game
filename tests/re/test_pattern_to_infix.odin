@@ -471,15 +471,15 @@ test_parseSingleTokenFromString :: proc(t: ^testing.T) {
 test_parseTokensFromString :: proc(t: ^testing.T) {
   using re
   {
-    patterns := [?]string{"h{1,2}[a-b\\W](?:h)(?P<name>A)\\b.\\.+s?b*\n\\n\\\\", "(((a)(b)(c)?))"}
-    expected_num_tokens := [?]int{20, 14}
+    patterns := [?]string{"h{1,2}", "[a-b\\W]", "(?:h)", "(?P<name>A)\\b.\\.+s?b*\n\\n\\\\", "(((a)(b)(c)?))"}
+    expected_num_tokens := [?]int{2, 1, 3, 14, 14}
     flags := [?]RegexFlags{{}, {.IGNORECASE}}
     for pattern, idx in patterns {
       for flag in flags {
         toks, ok := parseTokensFromString(pattern, flag)
         defer deleteTokens(&toks)
         expected_num := expected_num_tokens[idx]
-        tc.expect(t, ok, "Expected parse to be ok")
+        tc.expect(t, ok, fmt.tprintf("Expected parse to be ok for pattern:\"%v\"", pattern))
         cmp := len(toks) == expected_num
         if !cmp {
           fmt.printf("pattern: \"%v\" ok?% 5v Expected length:%v Got:%v\n", pattern, ok, expected_num, len(toks))
@@ -492,10 +492,10 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
     }
   }
   {
-    invalid_patterns := [?]string{"(", "((", ")", "?", "*", "+", "{1,4}", "a++"}
+    invalid_patterns := [?]string{"(", "((", ")", "?", "*", "+", "{1,4}", "a++", "$+", "+"}
     for pattern, idx in invalid_patterns {
       toks, ok := parseTokensFromString(pattern)
-      tc.expect(t, !ok, "Expected parse to be not ok")
+      tc.expect(t, !ok, fmt.tprintf("Expected parse to be not ok for pattern \"%v\"", pattern))
       tc.expect(t, toks == nil, "Expected tokens to be nil")
     }
   }
