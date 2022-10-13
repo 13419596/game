@@ -9,11 +9,11 @@ _PostfixTokens :: struct {
 }
 
 @(require_results)
-_makePostfixTokens :: proc() -> _PostfixTokens {
+_makePostfixTokens :: proc(allocator := context.allocator) -> _PostfixTokens {
   using queue
   out := _PostfixTokens {
-    out_tokens = make([dynamic]^Token),
-    stack = Queue(^Token){data = make([dynamic]^Token)},
+    out_tokens = make([dynamic]^Token, allocator),
+    stack = Queue(^Token){data = make([dynamic]^Token, allocator)},
   }
   init(&out.stack)
   return out
@@ -95,14 +95,14 @@ _addOperator :: proc(self: ^_PostfixTokens, token: ^Token) {
 ////////////////////////////////
 
 @(require_results)
-convertInfixToPostfix :: proc(infix_tokens: []Token) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
+convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.allocator) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
   // converts infix tokens to postfix order. It assumes that the groupigns are balanced
   ok = true
   if len(infix_tokens) == 0 {
     return
   }
-  state := _makePostfixTokens()
-  defer _deletePostfixTokens(&state)
+  // temporary state 
+  state := _makePostfixTokens(allocator = context.temp_allocator)
 
   concat_token: Token = ZeroWidthToken{.CONCATENATION}
   loop: for _, token_index in infix_tokens {
@@ -166,13 +166,14 @@ convertInfixToPostfix :: proc(infix_tokens: []Token) -> (out_postfix_tokens: [dy
       }
     }
   }
+
   // finish it out by pushing all remaining ops to the output.
-  copy_loop: for state.stack.len > 0 {
+  for state.stack.len > 0 {
     append(&state.out_tokens, queue.pop_back(&state.stack))
   }
 
   // copy data referenced by pointers to output
-  out_postfix_tokens = make([dynamic]Token)
+  out_postfix_tokens = make([dynamic]Token, allocator)
   for token in state.out_tokens {
     append(&out_postfix_tokens, copy_Token(token))
   }
