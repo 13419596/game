@@ -2,37 +2,86 @@ package re
 
 import queue "core:container/queue"
 
-/*
-@(private = "file")
-PostfixTokens :: struct($T: typeid) {
-  out_tokens: [dynamic]ExpressionToken(T),
-  stack:      queue.Queue(ExpressionToken(T)), // make this hold pointers instead..
+_PostfixTokens :: struct {
+  // internal data
+  out_tokens: [dynamic]^Token,
+  stack:      queue.Queue(^Token),
 }
 
-@(private = "file", require_results)
-makePostfixTokens :: proc($T: typeid) -> PostfixTokens(T) {
-  out := PostfixTokens(T) {
-    out_tokens = make([dynamic]ExpressionToken(T)),
-    stack = queue.Queue(ExpressionToken(T)){data = make([dynamic]ExpressionToken(T))},
+@(require_results)
+_makePostfixTokens :: proc() -> _PostfixTokens {
+  using queue
+  out := _PostfixTokens {
+    out_tokens = make([dynamic]^Token),
+    stack = Queue(^Token){data = make([dynamic]^Token)},
   }
-  queue.init(&out.stack)
+  init(&out.stack)
   return out
 }
 
 @(private = "file")
-deletePostfixTokens :: proc(token_stack: ^PostfixTokens($T)) {
+_deletePostfixTokens :: proc(token_stack: ^_PostfixTokens) {
   queue.destroy(&token_stack.stack)
   delete(token_stack.out_tokens)
-  token_stack.out_tokens = {}
+  token_stack.out_tokens = nil
 }
 
-//////////////
+///////////////////
+
+_getTokenPriorty :: proc(token: ^Token) -> int {
+  switch tok in token {
+  case LiteralToken:
+    return 10
+  case SetToken:
+    return 10
+  case ZeroWidthToken:
+    switch tok.op {
+    case .CONCATENATION:
+      return 8
+    case .ALTERNATION:
+      return 7
+    case .BEGINNING:
+      fallthrough
+    case .END:
+      return 6
+    }
+  case QuantityToken:
+    return 5
+  case GroupBeginToken:
+    return 2
+  case GroupEndToken:
+    return 1
+  }
+  return 0
+}
+
+@(require_results)
+_shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
+  for token in tokens {
+    switch tok in token {
+    case LiteralToken:
+      return true
+    case SetToken:
+      return true
+    case GroupBeginToken:
+      return true
+    //////////
+    case GroupEndToken:
+      return false
+    case ZeroWidthToken:
+      return false
+    case QuantityToken:
+      return false
+    }
+  }
+  return false
+}
 
 @(private = "file")
-addOperator :: proc(self: ^PostfixTokens($T), token: ExpressionToken(T)) {
+_addOperator :: proc(self: ^_PostfixTokens, token: ^Token) {
   // Shunting-yard alg. compares precedence levels of operator to be added and stack.
   for {
-    if self.stack.len == 0 || token.operation_type > queue.peek_back(&self.stack).operation_type {
+    if self.stack.len == 0 || _getTokenPriorty(token) > _getTokenPriorty(queue.peek_back(&self.stack)^) {
       queue.push_back(&self.stack, token)
       break
     } else {
@@ -42,128 +91,90 @@ addOperator :: proc(self: ^PostfixTokens($T), token: ExpressionToken(T)) {
   }
 }
 
-@(private = "file", require_results)
-shouldAddImplicitConcatenation :: proc(self: ^PostfixTokens($T), expr_tokens: []ExpressionToken(T)) -> bool {
-  for expr_token in expr_tokens {
-    switch expr_token.operation_type {
-    case .Token:
-      fallthrough
-    case .GroupingBegin:
-      fallthrough
-    case .Head:
-      fallthrough
-    case .Flag:
-      return true
-    case .GroupingEnd:
-      fallthrough
-    case .Alternation:
-      fallthrough
-    case .ZeroOrOne:
-      fallthrough
-    case .ZeroOrMore:
-      fallthrough
-    case .OneOrMore:
-      return false
-    case .Concatenation:
-      fallthrough
-    case .Tail:
-      // should not encounter
-      break
-    }
-  }
-  return false
-}
 
 ////////////////////////////////
 
 @(require_results)
-convertInfixToPostfix :: proc(infix_tokens: []ExpressionToken($T)) -> (out_postfix_tokens: [dynamic]ExpressionToken(T), ok: bool) {
-  ok = false
+convertInfixToPostfix :: proc(infix_tokens: []Token) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
+  // converts infix tokens to postfix order. It assumes that the groupigns are balanced
+  ok = true
   if len(infix_tokens) == 0 {
-    ok = true
-    // todo - should anything be allocated here? can I just return nil?
-    out_postfix_tokens = make([dynamic]ExpressionToken(T))
     return
   }
-  state := makePostfixTokens(T)
-  defer {
-    // At the end, swap the tokens from state, and then delete state
-    out_postfix_tokens = state.out_tokens
-    state.out_tokens = {}
-    deletePostfixTokens(&state)
-  }
+  state := _makePostfixTokens()
+  defer _deletePostfixTokens(&state)
 
-  for token, token_index in infix_tokens {
-    switch token.operation_type {
-    case .Head:
-      // TODO remove head and just treat as regular flag.
-      // if (!isValidRecursiveHeadAddition(itr + 1, end)) {
-      //     log_warning << "Not adding invalid recursive head token.";
-      //     return {};
-      // }
-      // out.push_back(val);
-      continue
-    case .Flag:
-      fallthrough
-    case .Token:
+  concat_token: Token = ZeroWidthToken{.CONCATENATION}
+  loop: for _, token_index in infix_tokens {
+    token := &infix_tokens[token_index]
+
+    switch tok in token {
+    case LiteralToken:
       append(&state.out_tokens, token)
-      if shouldAddImplicitConcatenation(&state, infix_tokens[token_index + 1:]) {
-        addOperator(&state, ExpressionToken(T){operation_type = .Concatenation})
+      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
+        _addOperator(&state, &concat_token)
       }
-    case .GroupingBegin:
+    case SetToken:
+      append(&state.out_tokens, token)
+      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
+        _addOperator(&state, &concat_token)
+      }
+    case GroupBeginToken:
       // always push group begins
+      append(&state.out_tokens, token)
       queue.push_back(&state.stack, token)
-    case .GroupingEnd:
+    case GroupEndToken:
       {
         // keep popping op stack till group end is found
         retrieved_begin := false
         for state.stack.len > 0 {
-          back_token := queue.pop_back(&state.stack)
-          if back_token.operation_type == .GroupingBegin {
+          back_token: ^Token = queue.pop_back(&state.stack)
+          if _, is_group_begin := back_token.(GroupBeginToken); is_group_begin {
             retrieved_begin = true
             break
           }
           append(&state.out_tokens, back_token)
         }
+        append(&state.out_tokens, token)
         if !retrieved_begin {
           // "Unbalanced parenthesis in expression. Cannot compute postfix expression.";
           ok = false
-          return
+          break loop
         }
-        if shouldAddImplicitConcatenation(&state, infix_tokens[token_index + 1:]) {
-          addOperator(&state, ExpressionToken(T){operation_type = .Concatenation})
+        if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
+          _addOperator(&state, &concat_token)
         }
       }
-    case .Alternation:
-      addOperator(&state, token)
-    case .ZeroOrOne:
-      fallthrough
-    case .ZeroOrMore:
-      fallthrough
-    case .OneOrMore:
-      // ?*+ tightly binds to previous token, so push token to output now.
+    case ZeroWidthToken:
+      switch tok.op {
+      case .ALTERNATION:
+        _addOperator(&state, token)
+      case .BEGINNING:
+        // may be correct, not sure
+        _addOperator(&state, token)
+      case .END:
+        // may be correct, not sure
+        _addOperator(&state, token)
+      case .CONCATENATION:
+      // not sure what to do here, shouldn't happen
+      }
+    case QuantityToken:
+      // quantity tokens tightly binds to previous token, so push token to output now.
       append(&state.out_tokens, token)
-      if shouldAddImplicitConcatenation(&state, infix_tokens[token_index + 1:]) {
-        addOperator(&state, ExpressionToken(T){operation_type = .Concatenation})
+      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
+        _addOperator(&state, &concat_token)
       }
-    case .Tail:
-    case .Concatenation:
-      // all other cases should not happen
-      // Incoming stream should not have a tail, or a concatenation symbol (they are implicit)
-      break
     }
   }
   // finish it out by pushing all remaining ops to the output.
-  for state.stack.len > 0 {
-    back_token := queue.pop_back(&state.stack)
-    if back_token.operation_type == .GroupingBegin {
-      // "Unbalanced parenthesis in expression. Cannot compute postfix expression."
-      ok = false
-      return
-    }
-    append(&state.out_tokens, back_token)
+  copy_loop: for state.stack.len > 0 {
+    append(&state.out_tokens, queue.pop_back(&state.stack))
   }
-  ok = true
+
+  // copy data referenced by pointers to output
+  out_postfix_tokens = make([dynamic]Token)
+  for token in state.out_tokens {
+    append(&out_postfix_tokens, copy_Token(token))
+  }
   return
 }
-*/

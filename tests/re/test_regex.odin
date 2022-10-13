@@ -11,6 +11,7 @@ main :: proc() {
   test_shorthand(&t)
   test_parse(&t)
   test_match_token(&t)
+  test_infix_to_postfix(&t, true)
 
   tc.report(&t)
 }
