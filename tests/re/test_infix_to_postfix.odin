@@ -30,30 +30,69 @@ areTokenArraysEqual :: proc(lhs, rhs: []re.Token) -> bool {
 test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
   using re
   context.allocator = context.temp_allocator
-  patterns := [?]string{"abc", "a(b?)+", "[ab]+(?P<name>[cd]?)*e{2,3}"}
-  expected_num_infix_tokens := [?]int{3, 6, 9}
+  patterns := [?]string{"(b|cd)", "abc", "a|bcd|e", "(a|bcd|e)", "a(b?)+", "[ab]+", "(a|b)?c"}
+  expected_num_infix_tokens := [?]int{6, 3, 7, 9, 6, 2, 7}
   all_expected_postfix_tokens := [?][]Token{
+    {
+      GroupBeginToken{index = 0},
+      LiteralToken{'b'},
+      LiteralToken{'c'},
+      LiteralToken{'d'},
+      SpecialToken{.CONCATENATION},
+      OperationToken{.ALTERNATION},
+      SpecialToken{.CONCATENATION},
+      GroupEndToken{index = 0},
+      SpecialToken{.CONCATENATION},
+    },
     {LiteralToken{'a'}, LiteralToken{'b'}, SpecialToken{.CONCATENATION}, LiteralToken{'c'}, SpecialToken{.CONCATENATION}},
+    {
+      LiteralToken{'a'},
+      LiteralToken{'b'},
+      LiteralToken{'c'},
+      SpecialToken{.CONCATENATION},
+      LiteralToken{'d'},
+      SpecialToken{.CONCATENATION},
+      OperationToken{.ALTERNATION},
+      LiteralToken{'e'},
+      OperationToken{.ALTERNATION},
+    },
+    {
+      GroupBeginToken{index = 0},
+      LiteralToken{'a'},
+      LiteralToken{'b'},
+      LiteralToken{'c'},
+      SpecialToken{.CONCATENATION},
+      LiteralToken{'d'},
+      SpecialToken{.CONCATENATION},
+      OperationToken{.ALTERNATION},
+      LiteralToken{'e'},
+      OperationToken{.ALTERNATION},
+      SpecialToken{.CONCATENATION},
+      GroupEndToken{index = 0},
+      SpecialToken{.CONCATENATION},
+    },
     {
       LiteralToken{'a'},
       GroupBeginToken{index = 0},
       LiteralToken{'b'},
       QuantityToken{0, 1},
+      SpecialToken{.CONCATENATION},
       GroupEndToken{index = 0},
+      SpecialToken{.CONCATENATION},
       QuantityToken{1, nil},
       SpecialToken{.CONCATENATION},
     },
+    {makeSetToken("ab"), QuantityToken{1, nil}},
     {
-      makeSetToken("ab"),
-      QuantityToken{1, nil},
-      GroupBeginToken{index = 0, mname = "name"},
-      makeSetToken("cd"),
-      QuantityToken{0, 1},
-      GroupEndToken{index = 0},
-      QuantityToken{0, nil},
+      GroupBeginToken{index = 0},
+      LiteralToken{'a'},
+      LiteralToken{'b'},
+      OperationToken{.ALTERNATION},
       SpecialToken{.CONCATENATION},
-      LiteralToken{'e'},
-      QuantityToken{2, 3},
+      GroupEndToken{index = 0},
+      SpecialToken{.CONCATENATION},
+      QuantityToken{0, 1},
+      LiteralToken{'c'},
       SpecialToken{.CONCATENATION},
     },
   }
@@ -85,14 +124,14 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       for _, idx in 0 ..< max(len(postfix_tokens), len(expected_postfix_tokens)) {
         fmt.printf("% 2d: \n", idx)
         if idx < len(postfix_tokens) {
-          fmt.printf("| %v\n", postfix_tokens[idx])
+          fmt.printf("| got: %v\n", postfix_tokens[idx])
         } else {
-          fmt.printf("| missing\n")
+          fmt.printf("| got: missing\n")
         }
         if idx < len(expected_postfix_tokens) {
-          fmt.printf("| %v\n", expected_postfix_tokens[idx])
+          fmt.printf("| exp: %v\n", expected_postfix_tokens[idx])
         } else {
-          fmt.printf("| missing\n")
+          fmt.printf("| exp: missing\n")
         }
       }
       fmt.printf("\n")

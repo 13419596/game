@@ -1,26 +1,26 @@
 package re
 
-import queue "core:container/queue"
+import Q "core:container/queue"
 
 _InfixToPostfixState :: struct {
   // internal data
   out_tokens: [dynamic]^Token,
-  stack:      queue.Queue(^Token),
+  stack:      Q.Queue(^Token),
 }
 
 @(require_results)
 _makeInfixToPostfixState :: proc(allocator := context.allocator) -> _InfixToPostfixState {
   out := _InfixToPostfixState {
     out_tokens = make([dynamic]^Token, allocator),
-    stack = queue.Queue(^Token){data = make([dynamic]^Token, allocator)},
+    stack = Q.Queue(^Token){data = make([dynamic]^Token, allocator)},
   }
-  queue.init(&out.stack)
+  Q.init(&out.stack)
   return out
 }
 
 @(private = "file")
 _deleteInfixToPostfixState :: proc(token_stack: ^_InfixToPostfixState) {
-  queue.destroy(&token_stack.stack)
+  Q.destroy(&token_stack.stack)
   delete(token_stack.out_tokens)
   token_stack.out_tokens = nil
 }
@@ -29,9 +29,9 @@ _deleteInfixToPostfixState :: proc(token_stack: ^_InfixToPostfixState) {
 
 
 _getTokenPriorty :: proc(token: ^Token) -> int {
-  top :: 4
+  top :: 5
   concat :: 3
-  below_concat :: 2
+  alternate :: concat - 1
   bottom :: 1
   switch tok in token {
   case LiteralToken:
@@ -50,7 +50,7 @@ _getTokenPriorty :: proc(token: ^Token) -> int {
   case OperationToken:
     switch tok.op {
     case .ALTERNATION:
-      return below_concat
+      return alternate
     case .DOLLAR:
       return bottom
     case .CARET:
@@ -67,7 +67,7 @@ _getTokenPriorty :: proc(token: ^Token) -> int {
 }
 
 @(require_results)
-_shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
+_shouldAddImplicitConcatenation :: proc(prev_token: ^Token, tokens: []Token) -> bool {
   for token in tokens {
     switch tok in token {
     case LiteralToken:
@@ -88,25 +88,42 @@ _shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
       return false
     }
   }
-  return false
+  if _, gok := prev_token.(GroupEndToken); gok {
+    return true
+  } else {
+    return false
+  }
 }
 
 @(private = "file")
 _addOperator :: proc(self: ^_InfixToPostfixState, token: ^Token) {
   // Shunting-yard alg. compares precedence levels of operator to be added and stack.
+  token_pri := _getTokenPriorty(token)
   for {
-    if self.stack.len == 0 || _getTokenPriorty(token) > _getTokenPriorty(queue.peek_back(&self.stack)^) {
-      queue.push_back(&self.stack, token)
+    if self.stack.len == 0 {
+      Q.push_back(&self.stack, token)
+      break
+    }
+    top_stack_token := Q.peek_back(&self.stack)^
+    top_stack_pri := _getTokenPriorty(top_stack_token)
+    if token_pri > top_stack_pri {
+      Q.push_back(&self.stack, token)
       break
     } else {
       // op stack is guaranteed to not be empty here
-      append(&self.out_tokens, queue.pop_back(&self.stack))
+      append(&self.out_tokens, Q.pop_back(&self.stack))
     }
   }
 }
 
-
-////////////////////////////////
+@(private = "file")
+_pushTokenAndPossibleImplicitConcat :: proc(state: ^_InfixToPostfixState, token: ^Token, trailing_infix_tokens: []Token, concat_token: ^Token) {
+  append(&state.out_tokens, token)
+  should_add := _shouldAddImplicitConcatenation(token, trailing_infix_tokens)
+  if should_add {
+    _addOperator(state, concat_token)
+  }
+}
 
 @(require_results)
 convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.allocator) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
@@ -121,48 +138,38 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
   concat_token: Token = SpecialToken{.CONCATENATION}
   loop: for _, token_index in infix_tokens {
     token := &infix_tokens[token_index]
-
     switch tok in token {
     case SpecialToken:
       // shouldn't appear in input stream, but treat it the same as a regular literal token
-      append(&state.out_tokens, token)
-      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
-        _addOperator(&state, &concat_token)
-      }
+      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
     case LiteralToken:
-      append(&state.out_tokens, token)
-      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
-        _addOperator(&state, &concat_token)
-      }
+      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
     case SetToken:
-      append(&state.out_tokens, token)
-      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
-        _addOperator(&state, &concat_token)
-      }
+      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
     case GroupBeginToken:
       // always push group begins
       append(&state.out_tokens, token)
-      queue.push_back(&state.stack, token)
+      Q.push_back(&state.stack, token) // push group begin sentinel so that group end knows how many symbols to pop
     case GroupEndToken:
       {
-        // keep popping op stack till group end is found
+        // keep popping op stack till first group begin is found
         retrieved_begin := false
         for state.stack.len > 0 {
-          back_token: ^Token = queue.pop_back(&state.stack)
+          back_token: ^Token = Q.pop_back(&state.stack)
           if _, is_group_begin := back_token.(GroupBeginToken); is_group_begin {
             retrieved_begin = true
             break
           }
           append(&state.out_tokens, back_token)
         }
+        // always add concat, ), concat
+        append(&state.out_tokens, &concat_token)
         append(&state.out_tokens, token)
+        append(&state.out_tokens, &concat_token)
         if !retrieved_begin {
           // "Unbalanced parenthesis in expression. Cannot compute postfix expression.";
           ok = false
           break loop
-        }
-        if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
-          _addOperator(&state, &concat_token)
         }
       }
     case OperationToken:
@@ -178,16 +185,13 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
       }
     case QuantityToken:
       // quantity tokens tightly binds to previous token, so push token to output now.
-      append(&state.out_tokens, token)
-      if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
-        _addOperator(&state, &concat_token)
-      }
+      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
     }
   }
 
   // finish it out by pushing all remaining ops to the output.
   for state.stack.len > 0 {
-    append(&state.out_tokens, queue.pop_back(&state.stack))
+    append(&state.out_tokens, Q.pop_back(&state.stack))
   }
 
   // copy data referenced by pointers to output
