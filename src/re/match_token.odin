@@ -7,15 +7,27 @@ import "core:unicode"
 import "core:unicode/utf8"
 import container_set "game:container/set"
 
-TokenOperation :: enum {
-  CONCATENATION = 4, // IMPLICIT
-  ALTERNATION   = 3, // |
-  END           = 2, // $
-  BEGINNING     = 1, // ^
+SpecialTokenType :: enum {
+  // Special tokens for use in the NFA
+  HEAD , // beginning of sequence
+  TAIL , // end of sequence
+  CONCATENATION , // implicit
 }
 
-ZeroWidthToken :: struct {
-  op: TokenOperation,
+SpecialToken :: struct {
+  op: SpecialTokenType 
+}
+
+OperationTokenType :: enum {
+  ALTERNATION   , // |
+  // named as such because meaning should be end-of-entire-sequence or end-of-line
+  // depending on the regex flags
+  DOLLAR , // $,  
+  CARET, // ^
+}
+
+OperationToken :: struct {
+  op: OperationTokenType,
 }
 
 QuantityToken :: struct {
@@ -49,7 +61,8 @@ GroupEndToken :: struct {
 
 
 Token :: union {
-  ZeroWidthToken,
+  SpecialToken,
+  OperationToken,
   GroupBeginToken,
   GroupEndToken,
   QuantityToken,
@@ -74,7 +87,8 @@ deleteGroupBeginToken :: proc(token: ^GroupBeginToken) {
 
 deleteToken :: proc(token: ^Token) {
   switch tok in token {
-  case ZeroWidthToken:
+  case SpecialToken:
+  case OperationToken:
   case GroupEndToken:
   case QuantityToken:
   case LiteralToken:
@@ -148,7 +162,9 @@ copy_Token :: proc(token: ^Token) -> Token {
     return copy_GroupBeginToken(&tok)
   case GroupEndToken:
     return tok
-  case ZeroWidthToken:
+  case SpecialToken:
+    return tok
+  case OperationToken:
     return tok
   case QuantityToken:
     return tok
@@ -184,8 +200,12 @@ isequal_Token :: proc(lhs, rhs: ^Token) -> bool {
     if rtok, ok := rhs.(GroupBeginToken); ok {
       return isequal_GroupBeginToken(&ltok, &rtok)
     }
-  case ZeroWidthToken:
-    if rtok, ok := rhs.(ZeroWidthToken); ok {
+  case SpecialToken:
+    if rtok, ok := rhs.(SpecialToken); ok {
+      return ltok == rtok
+    }
+  case OperationToken:
+    if rtok, ok := rhs.(OperationToken); ok {
       return ltok == rtok
     }
   case GroupEndToken:
@@ -670,18 +690,18 @@ parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.
       out = GroupEndToken{}
       return
     case '^':
-      out = ZeroWidthToken {
-        op = TokenOperation.BEGINNING,
+      out = OperationToken {
+        op = .CARET,
       }
       return
     case '$':
-      out = ZeroWidthToken {
-        op = TokenOperation.END,
+      out = OperationToken {
+        op = .DOLLAR,
       }
       return
     case '|':
-      out = ZeroWidthToken {
-        op = TokenOperation.ALTERNATION,
+      out = OperationToken {
+        op = .ALTERNATION,
       }
       return
     case '?':
@@ -747,7 +767,8 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
         token = makeCaseInsensitiveLiteral(&tok, allocator)
       case SetToken:
         updateSetTokenCaseInsensitive(&tok)
-      case ZeroWidthToken:
+      case SpecialToken:
+      case OperationToken:
       case QuantityToken:
       case GroupBeginToken:
       case GroupEndToken:
@@ -769,7 +790,8 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
         break loop
       }
       tok.index = pop_group_idx
-    case ZeroWidthToken:
+    case SpecialToken:
+    case OperationToken:
     case QuantityToken:
     case SetToken:
     case LiteralToken:

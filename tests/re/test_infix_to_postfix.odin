@@ -33,7 +33,7 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
   patterns := [?]string{"abc", "a(b?)+", "[ab]+(?P<name>[cd]?)*e{2,3}"}
   expected_num_infix_tokens := [?]int{3, 6, 9}
   all_expected_postfix_tokens := [?][]Token{
-    {LiteralToken{'a'}, LiteralToken{'b'}, ZeroWidthToken{.CONCATENATION}, LiteralToken{'c'}, ZeroWidthToken{.CONCATENATION}},
+    {LiteralToken{'a'}, LiteralToken{'b'}, SpecialToken{.CONCATENATION}, LiteralToken{'c'}, SpecialToken{.CONCATENATION}},
     {
       LiteralToken{'a'},
       GroupBeginToken{index = 0},
@@ -41,7 +41,7 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       QuantityToken{0, 1},
       GroupEndToken{index = 0},
       QuantityToken{1, nil},
-      ZeroWidthToken{.CONCATENATION},
+      SpecialToken{.CONCATENATION},
     },
     {
       makeSetToken("ab"),
@@ -51,10 +51,10 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       QuantityToken{0, 1},
       GroupEndToken{index = 0},
       QuantityToken{0, nil},
-      ZeroWidthToken{.CONCATENATION},
+      SpecialToken{.CONCATENATION},
       LiteralToken{'e'},
       QuantityToken{2, 3},
-      ZeroWidthToken{.CONCATENATION},
+      SpecialToken{.CONCATENATION},
     },
   }
   tc.expect(t, len(patterns) == len(expected_num_infix_tokens), "Expected num patterns to be equal to num expected infix lengths")
