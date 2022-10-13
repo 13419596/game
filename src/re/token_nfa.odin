@@ -2,6 +2,7 @@ package re
 
 import Q "core:container/queue"
 import set "game:container/set"
+import "core:fmt"
 
 @(private)
 KeyType :: int
@@ -215,6 +216,7 @@ _repeatFragment :: proc(self: ^_Fragment, nfa: ^TokenNfa, num_copies: int, num_t
   if num_copies == 0 {
     self.has_bypass = true
   }
+  fmt.printf("Repeating fragment:%v \n nc:%v -- ntbc:%v\ndg:%v\n\n", self, num_copies, num_trailing_bypass_copies, nfa.digraph)
   dg := &nfa.digraph
   initial_fragment := _copyFragment(self, context.temp_allocator)
   // note: if num_copies ==1 then don't add any copies
@@ -228,8 +230,12 @@ _repeatFragment :: proc(self: ^_Fragment, nfa: ^TokenNfa, num_copies: int, num_t
   initial_fragment.has_bypass = true
   if num_trailing_bypass_copies <= 0 {
     // infinite trailing copies - add zero more to end
-    _oneOrMoreFragment(&initial_fragment, dg)
-    _appendFragment(self, &initial_fragment, dg)
+    if num_copies == 1 {
+      _oneOrMoreFragment(self, dg)
+    } else {
+      _oneOrMoreFragment(&initial_fragment, dg)
+      _appendFragment(self, &initial_fragment, dg)
+    }
   } else if num_trailing_bypass_copies >= 1 {
     for n in 0 ..< num_trailing_bypass_copies {
       dup_frag, dup_ok := _duplicateFragment(&initial_fragment, nfa, context.temp_allocator)
@@ -239,6 +245,7 @@ _repeatFragment :: proc(self: ^_Fragment, nfa: ^TokenNfa, num_copies: int, num_t
       _appendFragment(self, &dup_frag, dg)
     }
   }
+  fmt.printf("final frag:%v\n----------------\n", self)
   return true
 }
 /////////////////////////
@@ -264,6 +271,7 @@ _deletePostfixToNfaState :: proc(state: ^_PostfixToNfaState) {
     _deleteFragment(&frag)
   }
   Q.destroy(&state.frag_stack)
+  state.nfa = nil
 }
 
 /////////////////////////
@@ -286,11 +294,8 @@ makeTokenNfaFromPostfixTokens :: proc(postfix_tokens: []Token, allocator := cont
       break
     }
   }
-
   // now add tail and then two concats
-  if ok && !_processToken(&state, &out.tokens[out.tail_index]) {
-    ok = false
-  }
+  Q.push_back(&state.frag_stack, _makeInitialFragment(out.tail_index))
   // concats are implcit, and therefore don't show up in final NFA
   concat_token: Token = SpecialToken{.CONCATENATION}
   if ok && !_processToken(&state, &concat_token) {
@@ -299,12 +304,10 @@ makeTokenNfaFromPostfixTokens :: proc(postfix_tokens: []Token, allocator := cont
   if ok && !_processToken(&state, &concat_token) {
     ok = false
   }
-
   // Check if head -> head; 
   if ok && set.contains(&out.digraph[out.head_index], out.head_index) {
     ok = false
   }
-
   if !ok {
     deleteTokenNfa(&out)
   }
@@ -378,18 +381,23 @@ _processToken :: proc(state: ^_PostfixToNfaState, token: ^Token, allocator := co
 }
 
 @(require_results)
-makeTokenNfaFromPattern :: proc(pattern: string, flags: RegexFlags, allocator := context.allocator) -> (out: TokenNfa, ok: bool) {
+makeTokenNfaFromPattern :: proc(pattern: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: TokenNfa, ok: bool) {
   ok = false
   infix_tokens, infix_ok := parseTokensFromString(pattern, flags, context.temp_allocator)
   if !infix_ok {
     return
   }
   postfix_tokens, postfix_ok := convertInfixToPostfix(infix_tokens[:], context.temp_allocator)
+  fmt.printf("postfix toks:\n")
+  for tok, idx in postfix_tokens {
+    fmt.printf("% 2d: %v\n", idx, tok)
+  }
+  fmt.printf("---------\n")
   if !postfix_ok {
     return
   }
-  nfa, nfa_ok := makeTokenNfaFromPostfixTokens(postfix_tokens[:], allocator)
-  if !nfa_ok {
+  out, ok = makeTokenNfaFromPostfixTokens(postfix_tokens[:], allocator)
+  if !ok {
     return
   }
   ok = true
