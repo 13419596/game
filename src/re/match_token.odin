@@ -8,10 +8,10 @@ import "core:unicode/utf8"
 import container_set "game:container/set"
 
 TokenOperation :: enum {
-  CONCATENATION = 3, // IMPLICIT
-  ALTERNATION   = 2, // |
-  BEGINNING     = 1,
-  END           = 0,
+  CONCATENATION = 4, // IMPLICIT
+  ALTERNATION   = 3, // |
+  END           = 2, // $
+  BEGINNING     = 1, // ^
 }
 
 ZeroWidthToken :: struct {
@@ -56,6 +56,9 @@ Token :: union {
   SetToken,
   LiteralToken,
 }
+
+/////////////
+// Delete
 
 deleteSetToken :: proc(token: ^SetToken) {
   using container_set
@@ -104,6 +107,59 @@ deleteTokens :: proc {
   deleteTokens_dynamic,
   deleteTokens_array,
 }
+
+/////////////
+// clone
+
+@(require_results)
+copy_SetToken :: proc(token: ^SetToken, allocator := context.allocator) -> SetToken {
+  using container_set
+  out := SetToken {
+    charset        = copy(&token.charset, allocator),
+    set_negated    = token.set_negated,
+    pos_shorthands = token.pos_shorthands,
+    neg_shorthands = token.neg_shorthands,
+  }
+  return out
+}
+
+@(require_results)
+copy_GroupBeginToken :: proc(token: ^GroupBeginToken, allocator := context.allocator) -> GroupBeginToken {
+  using container_set
+  mname_copy: Maybe(string) = nil
+  if name, ok := token.mname.(string); ok {
+    mname_copy = strings.clone(name, allocator)
+  }
+  out := GroupBeginToken {
+    index         = token.index,
+    mname         = mname_copy,
+    non_capturing = token.non_capturing,
+  }
+  return out
+}
+
+@(require_results)
+copy_Token :: proc(token: ^Token) -> Token {
+  token := token
+  switch tok in token {
+  case SetToken:
+    return copy_SetToken(&tok)
+  case GroupBeginToken:
+    return copy_GroupBeginToken(&tok)
+  case GroupEndToken:
+    return tok
+  case ZeroWidthToken:
+    return tok
+  case QuantityToken:
+    return tok
+  case LiteralToken:
+    return tok
+  }
+  return token^
+}
+
+/////////////
+// Is Equal
 
 isequal_SetToken :: proc(lhs, rhs: ^SetToken) -> bool {
   return(
@@ -351,7 +407,7 @@ _parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok:
   return
 }
 
-
+@(require_results)
 _parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: SetToken, bytes_parsed: int, ok: bool) {
   // starts parsing from first [
   using container_set
@@ -511,6 +567,7 @@ _parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.alloca
   return
 }
 
+@(require_results)
 _parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
   // starts parsing after first (
   bytes_parsed = 0
@@ -575,6 +632,7 @@ _parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context
   return
 }
 
+@(require_results)
 parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
   using container_set
   defer if !ok {bytes_parsed = 0}
@@ -663,6 +721,7 @@ parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.
   return
 }
 
+@(require_results)
 parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: [dynamic]Token, ok: bool) {
   out = make([dynamic]Token, allocator)
   ok = true
@@ -741,6 +800,7 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
 
 //////////////////////////////////////
 
+@(require_results)
 makeCaseInsensitiveLiteral :: proc(lit_token: ^LiteralToken, allocator := context.allocator) -> Token {
   // If literal token has a character that can be lower/upper then return a set token otherwise return the same
   using unicode

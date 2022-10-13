@@ -10,12 +10,35 @@ import re "game:re"
 import container_set "game:container/set"
 import tc "tests:common"
 
+@(private)
+makeSetToken :: proc(
+  set_chars: string = "",
+  set_negated: bool = false,
+  pos_sh: bit_set[re.ShortHandClass] = {},
+  neg_sh: bit_set[re.ShortHandClass] = {},
+  allocator := context.allocator,
+) -> re.SetToken {
+  // Helper function to make set tokens
+  using container_set
+  using re
+  out := SetToken {
+    charset        = makeSet(T = rune, allocator = allocator),
+    set_negated    = set_negated,
+    pos_shorthands = pos_sh,
+    neg_shorthands = neg_sh,
+  }
+  for rn in set_chars {
+    add(&out.charset, rn)
+  }
+  return out
+}
+
 @(test)
 test_match_token :: proc(t: ^testing.T) {
-  test__parseLatterQuantityToken(t)
-  test__parseLatterEscapedRune(t)
-  test__parseLatterSetToken(t)
-  test__parseLatterGroupBeginToken(t)
+  test_parseLatterQuantityToken(t)
+  test_parseLatterEscapedRune(t)
+  test_parseLatterSetToken(t)
+  test_parseLatterGroupBeginToken(t)
   test_parseSingleTokenFromString(t)
   test_makeCaseInsensitiveLiteral(t)
   test_updateSetTokenCaseInsensitive(t)
@@ -25,7 +48,7 @@ test_match_token :: proc(t: ^testing.T) {
 
 
 @(test)
-test__parseLatterQuantityToken :: proc(t: ^testing.T) {
+test_parseLatterQuantityToken :: proc(t: ^testing.T) {
   using re
   {
     invalid_patterns := [?]string{"5,3}"}
@@ -79,7 +102,7 @@ test__parseLatterQuantityToken :: proc(t: ^testing.T) {
 }
 
 @(test)
-test__parseLatterEscapedRune :: proc(t: ^testing.T) {
+test_parseLatterEscapedRune :: proc(t: ^testing.T) {
   using re
   {
     // escaped metas
@@ -134,30 +157,8 @@ test__parseLatterEscapedRune :: proc(t: ^testing.T) {
   }
 }
 
-@(private = "file")
-makeSetToken :: proc(
-  set_chars: string = "",
-  set_negated: bool = false,
-  pos_sh: bit_set[re.ShortHandClass] = {},
-  neg_sh: bit_set[re.ShortHandClass] = {},
-  allocator := context.allocator,
-) -> re.SetToken {
-  using container_set
-  using re
-  out := SetToken {
-    charset        = makeSet(T = rune, allocator = allocator),
-    set_negated    = set_negated,
-    pos_shorthands = pos_sh,
-    neg_shorthands = neg_sh,
-  }
-  for rn in set_chars {
-    add(&out.charset, rn)
-  }
-  return out
-}
-
 @(test)
-test__parseLatterSetToken :: proc(t: ^testing.T) {
+test_parseLatterSetToken :: proc(t: ^testing.T) {
   using re
   using sort
   using container_set
@@ -248,7 +249,7 @@ test__parseLatterSetToken :: proc(t: ^testing.T) {
 
 
 @(test)
-test__parseLatterGroupBeginToken :: proc(t: ^testing.T) {
+test_parseLatterGroupBeginToken :: proc(t: ^testing.T) {
   using re
   using sort
   using container_set
