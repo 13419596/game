@@ -81,6 +81,28 @@ deleteToken :: proc(token: ^Token) {
   case SetToken:
     deleteSetToken(&tok)
   }
+  token^ = nil
+}
+
+deleteTokens_dynamic :: proc(tokens: ^[dynamic]Token) {
+  for _, idx in tokens {
+    deleteToken(&tokens[idx])
+  }
+  clear(tokens)
+  delete(tokens^)
+  tokens^ = nil
+}
+
+deleteTokens_array :: proc(tokens: ^[]Token) {
+  for _, idx in tokens {
+    deleteToken(&tokens[idx])
+    tokens[idx] = nil
+  }
+}
+
+deleteTokens :: proc {
+  deleteTokens_dynamic,
+  deleteTokens_array,
 }
 
 isequal_SetToken :: proc(lhs, rhs: ^SetToken) -> bool {
@@ -126,7 +148,7 @@ isequal_Token :: proc(lhs, rhs: ^Token) -> bool {
   return false
 }
 
-parseLatterQuantityToken :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed: int, ok: bool) {
+_parseLatterQuantityToken :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed: int, ok: bool) {
   // parses starting after the first {
   ok = true
   defer if !ok {bytes_parsed = 0}
@@ -246,7 +268,7 @@ parseLatterQuantityToken :: proc(unparsed_runes: string) -> (out: Token, bytes_p
   return
 }
 
-parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok: bool) {
+_parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok: bool) {
   bytes_parsed = 1
   ok = true
   defer if !ok {bytes_parsed = 0}
@@ -330,7 +352,7 @@ parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok: 
 }
 
 
-parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: SetToken, bytes_parsed: int, ok: bool) {
+_parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: SetToken, bytes_parsed: int, ok: bool) {
   // starts parsing from first [
   using container_set
   ok = true
@@ -489,7 +511,7 @@ parseLatterSetToken :: proc(unparsed_runes: string, allocator := context.allocat
   return
 }
 
-parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
+_parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: GroupBeginToken, bytes_parsed: int, ok: bool) {
   // starts parsing after first (
   bytes_parsed = 0
   ok = true
@@ -548,12 +570,12 @@ parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context.
     bytes_parsed = 0
     return
   }
-  bytes_parsed += name_width
+  bytes_parsed += name_width + 1 // name + >
   out.mname = strings.clone(unparsed_runes[name_start_index:name_start_index + name_width], allocator)
   return
 }
 
-makeTokenFromString :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
+parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
   using container_set
   defer if !ok {bytes_parsed = 0}
   bytes_parsed = 0
@@ -563,7 +585,7 @@ makeTokenFromString :: proc(unparsed_runes: string, allocator := context.allocat
     bytes_parsed += utf8.rune_size(rn)
     switch rn {
     case '[':
-      out, group_bytes_parsed, ok = parseLatterSetToken(unparsed_runes[bytes_parsed:], allocator)
+      out, group_bytes_parsed, ok = _parseLatterSetToken(unparsed_runes[bytes_parsed:], allocator)
       bytes_parsed += group_bytes_parsed
       return
     case '\\':
@@ -573,15 +595,15 @@ makeTokenFromString :: proc(unparsed_runes: string, allocator := context.allocat
         bytes_parsed = 0
         return
       }
-      out, group_bytes_parsed, ok = parseLatterEscapedRune(rune(unparsed_runes[bytes_parsed]))
+      out, group_bytes_parsed, ok = _parseLatterEscapedRune(rune(unparsed_runes[bytes_parsed]))
       bytes_parsed += group_bytes_parsed
       return
     case '(':
-      out, group_bytes_parsed, ok = parseLatterGroupBeginToken(unparsed_runes[bytes_parsed:], allocator)
+      out, group_bytes_parsed, ok = _parseLatterGroupBeginToken(unparsed_runes[bytes_parsed:], allocator)
       bytes_parsed += group_bytes_parsed
       return
     case '{':
-      out, group_bytes_parsed, ok = parseLatterQuantityToken(unparsed_runes[bytes_parsed:])
+      out, group_bytes_parsed, ok = _parseLatterQuantityToken(unparsed_runes[bytes_parsed:])
       bytes_parsed += group_bytes_parsed
       return
 
@@ -641,11 +663,97 @@ makeTokenFromString :: proc(unparsed_runes: string, allocator := context.allocat
   return
 }
 
+parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: [dynamic]Token, ok: bool) {
+  out = make([dynamic]Token, allocator)
+  ok = true
+  pout := &out
+  // TODO handle other regex flags
+  case_insensitive := .IGNORECASE in flags
+  prev_token_is_quantifier := true // cannot add two quantifiers in a row
+  head_idx := 0
+  group_index := 0
+  group_index_stack := make([dynamic]int, context.temp_allocator)
+  defer delete(group_index_stack)
+  loop: for head_idx < len(s) {
+    token, bytes_parsed, token_ok := parseSingleTokenFromString(s[head_idx:])
+    if !token_ok {
+      ok = false
+      return
+    }
+    head_idx += bytes_parsed
+
+    if case_insensitive {
+      switch tok in &token {
+      case LiteralToken:
+        token = makeCaseInsensitiveLiteral(&tok, allocator)
+      case SetToken:
+        updateSetTokenCaseInsensitive(&tok)
+      case ZeroWidthToken:
+      case QuantityToken:
+      case GroupBeginToken:
+      case GroupEndToken:
+      // do nothing
+      }
+    }
+
+    // Set Grouping Indices
+    switch tok in &token {
+    case GroupBeginToken:
+      tok.index = group_index
+      append(&group_index_stack, group_index)
+      group_index += 1
+    case GroupEndToken:
+      pop_group_idx, pop_ok := pop_safe(&group_index_stack)
+      if !pop_ok {
+        // unbalanced levels
+        ok = false
+        break loop
+      }
+      tok.index = pop_group_idx
+    case ZeroWidthToken:
+    case QuantityToken:
+    case SetToken:
+    case LiteralToken:
+    // do nothing
+    }
+
+    // Check that quantifier doesn't follow quantifier
+    if _, q_ok := token.(QuantityToken); q_ok {
+      if prev_token_is_quantifier {
+        ok = false
+      }
+      prev_token_is_quantifier = true
+    } else {
+      prev_token_is_quantifier = false
+    }
+    append(&out, token)
+  }
+  if len(group_index_stack) != 0 {
+    // unbalanced
+    ok = false
+  }
+  if !ok {
+    deleteTokens(&out)
+  }
+  return
+}
+
 
 //////////////////////////////////////
 
+makeCaseInsensitiveLiteral :: proc(lit_token: ^LiteralToken, allocator := context.allocator) -> Token {
+  // If literal token has a character that can be lower/upper then return a set token otherwise return the same
+  using unicode
+  using container_set
+  rn := lit_token.value
+  if !is_lower(rn) && !is_upper(lit_token.value) {
+    return lit_token^
+  }
+  arr := [?]rune{to_lower(rn), to_upper(rn)}
+  return SetToken{charset = fromArray(arr = arr[:], allocator = allocator)}
+}
 
-makeSetTokenCaseInsensitive :: proc(set_token: ^SetToken) {
+updateSetTokenCaseInsensitive :: proc(set_token: ^SetToken) {
   // it is expected that the number of characters in the set tokens 
   // will be less than the total of all characters compared, so expanding the
   // set token to include both pairs will be faster than changing case of all compared strings
@@ -654,24 +762,6 @@ makeSetTokenCaseInsensitive :: proc(set_token: ^SetToken) {
   for k, _ in set_token.charset.set {
     add(&set_token.charset, to_lower(k))
     add(&set_token.charset, to_upper(k))
-  }
-}
-
-makeLiteralTokenCaseInsensitive :: proc(lit_token: ^LiteralToken) {
-  lit_token.value = unicode.to_lower(lit_token.value)
-}
-
-makeTokenCaseInsensitive :: proc(token: ^Token) {
-  switch tok in token {
-  case LiteralToken:
-    makeLiteralTokenCaseInsensitive(&tok)
-  case SetToken:
-    makeSetTokenCaseInsensitive(&tok)
-  case GroupBeginToken:
-  case GroupEndToken:
-  case ZeroWidthToken:
-  case QuantityToken:
-  // do nothing
   }
 }
 

@@ -12,25 +12,25 @@ import tc "tests:common"
 
 @(test)
 test_match_token :: proc(t: ^testing.T) {
-  test_parseLatterQuantityToken(t)
-  test_parseLatterEscapedRune(t)
-  test_parseLatterSetToken(t)
-  test_parseLatterGroupBeginToken(t)
-  test_makeTokenFromString(t)
-  test_makeLiteralTokenCaseInsensitive(t)
-  test_makeSetTokenCaseInsensitive(t)
-  test_makeTokenCaseInsensitive(t)
+  test__parseLatterQuantityToken(t)
+  test__parseLatterEscapedRune(t)
+  test__parseLatterSetToken(t)
+  test__parseLatterGroupBeginToken(t)
+  test_parseSingleTokenFromString(t)
+  test_makeCaseInsensitiveLiteral(t)
+  test_updateSetTokenCaseInsensitive(t)
   test_doesSetTokenMatch(t)
+  test_parseTokensFromString(t)
 }
 
 
 @(test)
-test_parseLatterQuantityToken :: proc(t: ^testing.T) {
+test__parseLatterQuantityToken :: proc(t: ^testing.T) {
   using re
   {
     invalid_patterns := [?]string{"5,3}"}
     for pattern in invalid_patterns {
-      tok, num_bytes_parsed, ok := parseLatterQuantityToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterQuantityToken(pattern)
       tc.expect(t, !ok, fmt.tprintf("Expected pattern:\"%v\" to be not ok", pattern))
     }
   }
@@ -40,7 +40,7 @@ test_parseLatterQuantityToken :: proc(t: ^testing.T) {
       value = '{',
     }
     for pattern in literal_patterns {
-      tok, num_bytes_parsed, ok := parseLatterQuantityToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterQuantityToken(pattern)
       tc.expect(t, ok, fmt.tprintf("Expected pattern:\"%v\" to be not ok", pattern))
       tc.expect(t, num_bytes_parsed == 0, fmt.tprintf("Pattern:len(\"%v\") Expected:%v; Got %v", pattern, 0, num_bytes_parsed))
       if ltok, ltok_ok := tok.(LiteralToken); ltok_ok {
@@ -65,7 +65,7 @@ test_parseLatterQuantityToken :: proc(t: ^testing.T) {
       QuantityToken{11, 434},
     }
     for pattern, idx in valid_patterns {
-      tok, num_bytes_parsed, ok := parseLatterQuantityToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterQuantityToken(pattern)
       expected := expecteds[idx]
       tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Not okay", pattern, expected))
       tc.expect(t, num_bytes_parsed == len(pattern), fmt.tprintf("Pattern:len(\"%v\")==%v; Got %v", pattern, len(pattern), num_bytes_parsed))
@@ -79,13 +79,13 @@ test_parseLatterQuantityToken :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_parseLatterEscapedRune :: proc(t: ^testing.T) {
+test__parseLatterEscapedRune :: proc(t: ^testing.T) {
   using re
   {
     // escaped metas
     meta_chars := "$^*+?\\.|(){}[]"
     for rn in meta_chars {
-      tok, num_bytes_parsed, ok := parseLatterEscapedRune(rn)
+      tok, num_bytes_parsed, ok := _parseLatterEscapedRune(rn)
       expected := LiteralToken{rn}
       tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Not okay", rn, expected))
       tc.expect(t, num_bytes_parsed == 1)
@@ -101,7 +101,7 @@ test_parseLatterEscapedRune :: proc(t: ^testing.T) {
     special_chars := "ntv"
     expecteds := "\n\t\v"
     for rn, idx in special_chars {
-      tok, num_bytes_parsed, ok := parseLatterEscapedRune(rn)
+      tok, num_bytes_parsed, ok := _parseLatterEscapedRune(rn)
       expected := LiteralToken{rune(expecteds[idx])}
       tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Not okay", rn, expected))
       tc.expect(t, num_bytes_parsed == 1)
@@ -119,7 +119,7 @@ test_parseLatterEscapedRune :: proc(t: ^testing.T) {
     for to_upper in 0 ..= 1 {
       for initial_rn, idx in class_chars {
         rn := to_upper != 0 ? unicode.to_upper(initial_rn) : initial_rn
-        tok, num_bytes_parsed, ok := parseLatterEscapedRune(rn)
+        tok, num_bytes_parsed, ok := _parseLatterEscapedRune(rn)
         defer deleteToken(&tok)
         expected := to_upper != 0 ? SetToken{neg_shorthands = {expected_classes[idx]}} : SetToken{pos_shorthands = {expected_classes[idx]}}
         tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Not okay", rn, expected))
@@ -157,14 +157,14 @@ makeSetToken :: proc(
 }
 
 @(test)
-test_parseLatterSetToken :: proc(t: ^testing.T) {
+test__parseLatterSetToken :: proc(t: ^testing.T) {
   using re
   using sort
   using container_set
   {
     invalid_patterns := [?]string{"", "]", "a", "\\", "\\]", "a-z"}
     for pattern, idx in invalid_patterns {
-      tok, num_bytes_parsed, ok := parseLatterSetToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterSetToken(pattern)
       tc.expect(t, !ok, fmt.tprintf("Pattern:\"%v\"; Expected Not okay", pattern))
       tc.expect(t, num_bytes_parsed == 0, fmt.tprintf("Pattern:len(\"%v\")==%v; Got %v", pattern, len(pattern), num_bytes_parsed))
     }
@@ -220,7 +220,7 @@ test_parseLatterSetToken :: proc(t: ^testing.T) {
     }
     tc.expect(t, len(valid_patterns) == len(expecteds), "expected patterns and results to be same length")
     for pattern, idx in valid_patterns {
-      tok, num_bytes_parsed, ok := parseLatterSetToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterSetToken(pattern)
       expected := expecteds[idx]
       tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Not okay", pattern, expected))
       tc.expect(t, num_bytes_parsed == len(pattern), fmt.tprintf("Pattern:len(\"%v\")==%v; Got %v", pattern, len(pattern), num_bytes_parsed))
@@ -248,14 +248,14 @@ test_parseLatterSetToken :: proc(t: ^testing.T) {
 
 
 @(test)
-test_parseLatterGroupBeginToken :: proc(t: ^testing.T) {
+test__parseLatterGroupBeginToken :: proc(t: ^testing.T) {
   using re
   using sort
   using container_set
   {
     invalid_patterns := [?]string{"?", "?<foo>", "?P<f-o>", "?P<foo!>", "?P<<foo>"}
     for pattern, idx in invalid_patterns {
-      tok, num_bytes_parsed, ok := parseLatterGroupBeginToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterGroupBeginToken(pattern)
       tc.expect(t, !ok, fmt.tprintf("Pattern:\"%v\"; Expected Not okay", pattern))
       tc.expect(t, num_bytes_parsed == 0, fmt.tprintf("Pattern:\"%v\"; Expected bytes==0; Got %v", pattern, num_bytes_parsed))
     }
@@ -271,11 +271,11 @@ test_parseLatterGroupBeginToken :: proc(t: ^testing.T) {
       GroupBeginToken{mname = "name"},
       GroupBeginToken{mname = "námë3"},
     }
-    lengths := [?]int{0, 0, 2, 2, 7, 7, 10}
+    lengths := [?]int{0, 0, 2, 2, 8, 8, 11}
     tc.expect(t, len(valid_patterns) == len(expecteds), "expected patterns and results to be same length")
     tc.expect(t, len(valid_patterns) == len(lengths), "expected patterns and results to be same length")
     for pattern, idx in valid_patterns {
-      tok, num_bytes_parsed, ok := parseLatterGroupBeginToken(pattern)
+      tok, num_bytes_parsed, ok := _parseLatterGroupBeginToken(pattern)
       defer deleteGroupBeginToken(&tok)
       expected := expecteds[idx]
       tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Not okay", pattern, expected))
@@ -294,12 +294,12 @@ test_parseLatterGroupBeginToken :: proc(t: ^testing.T) {
 
 
 @(test)
-test_makeTokenFromString :: proc(t: ^testing.T) {
+test_parseSingleTokenFromString :: proc(t: ^testing.T) {
   using re
   {
     invalid_patterns := [?]string{"\\"}
     for pattern, idx in invalid_patterns {
-      tok, num_bytes_parsed, ok := makeTokenFromString(pattern)
+      tok, num_bytes_parsed, ok := parseSingleTokenFromString(pattern)
       defer deleteToken(&tok)
       tc.expect(t, num_bytes_parsed == 0, fmt.tprintf("Expected bytes parsed == 0. Got:%v", num_bytes_parsed))
       tc.expect(t, !ok, "Expected not okay")
@@ -319,8 +319,8 @@ test_makeTokenFromString :: proc(t: ^testing.T) {
       "{1,44}",
       "{11,434}",
       // Set Patterns
-      "[a]a",
-      "[ab]a",
+      "[a]",
+      "[ab]",
       "[\\\\]",
       "[\\]]",
       "[a-d]",
@@ -481,37 +481,25 @@ test_makeTokenFromString :: proc(t: ^testing.T) {
     tc.expect(t, len(valid_patterns) == len(expecteds), "Expected patterns and expected results to be same length")
     for pattern, idx in valid_patterns {
       expected := expecteds[idx]
-      tok, num_bytes_parsed, ok := makeTokenFromString(pattern)
+      tok, num_bytes_parsed, ok := parseSingleTokenFromString(pattern)
       defer deleteToken(&tok)
-      // tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\" Expected to be okay.", pattern))
+      tc.expect(t, ok, fmt.tprintf("Pattern:\"%v\" Expected to be okay.", pattern))
       cmp := isequal_Token(&tok, &expected)
       tc.expect(t, cmp, fmt.tprintf("Pattern:\"%v\" Expected:%v Got:%v", pattern, expected, tok))
+      tc.expect(t, len(pattern) == num_bytes_parsed, fmt.tprintf("Expected len(\"%v\")==%v  Got:%v", pattern, len(pattern), num_bytes_parsed))
     }
   }
 }
 
 @(test)
-test_makeLiteralTokenCaseInsensitive :: proc(t: ^testing.T) {
-  using re
-  inputs := [?]LiteralToken{LiteralToken{'a'}, LiteralToken{'.'}, LiteralToken{'A'}, LiteralToken{'Ø'}, LiteralToken{'Ä'}}
-  expecteds := [?]LiteralToken{LiteralToken{'a'}, LiteralToken{'.'}, LiteralToken{'a'}, LiteralToken{'ø'}, LiteralToken{'ä'}}
-  for _, idx in inputs {
-    input := &inputs[idx]
-    makeLiteralTokenCaseInsensitive(input)
-    expected := expecteds[idx]
-    tc.expect(t, input^ == expected, fmt.tprintf("Expected:%v Got:%v", expected, input))
-  }
-}
-
-@(test)
-test_makeSetTokenCaseInsensitive :: proc(t: ^testing.T) {
+test_updateSetTokenCaseInsensitive :: proc(t: ^testing.T) {
   using re
   context.allocator = context.temp_allocator
   inputs := [?]SetToken{makeSetToken("aaB"), makeSetToken("."), makeSetToken("ABCd0"), makeSetToken("Ø"), makeSetToken("Ä")}
   expecteds := [?]SetToken{makeSetToken("abAB"), makeSetToken("."), makeSetToken("abcdABCD0"), makeSetToken("øØ"), makeSetToken("äÄ")}
   for _, idx in inputs {
     input := &inputs[idx]
-    makeSetTokenCaseInsensitive(input)
+    updateSetTokenCaseInsensitive(input)
     expected := expecteds[idx]
     cmp := isequal_SetToken(input, &expected)
     tc.expect(t, cmp, fmt.tprintf("Expected:%v Got:%v", expected, input))
@@ -519,37 +507,16 @@ test_makeSetTokenCaseInsensitive :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_makeTokenCaseInsensitive :: proc(t: ^testing.T) {
+test_makeCaseInsensitiveLiteral :: proc(t: ^testing.T) {
   using re
-  inputs := [?]Token{
-    LiteralToken{'a'},
-    LiteralToken{'.'},
-    LiteralToken{'A'},
-    LiteralToken{'Ø'},
-    LiteralToken{'Ä'},
-    makeSetToken("aaB"),
-    makeSetToken("."),
-    makeSetToken("ABCd0"),
-    makeSetToken("Ø"),
-    makeSetToken("Ä"),
-  }
-  expecteds := [?]Token{
-    LiteralToken{'a'},
-    LiteralToken{'.'},
-    LiteralToken{'a'},
-    LiteralToken{'ø'},
-    LiteralToken{'ä'},
-    makeSetToken("abAB"),
-    makeSetToken("."),
-    makeSetToken("abcdABCD0"),
-    makeSetToken("øØ"),
-    makeSetToken("äÄ"),
-  }
+  context.allocator = context.temp_allocator
+  inputs := [?]LiteralToken{LiteralToken{'.'}, LiteralToken{'a'}, LiteralToken{'Ø'}}
+  expecteds := [?]Token{LiteralToken{'.'}, makeSetToken("aA"), makeSetToken("øØ")}
   for _, idx in inputs {
     input := &inputs[idx]
-    makeTokenCaseInsensitive(input)
+    result := makeCaseInsensitiveLiteral(input)
     expected := expecteds[idx]
-    cmp := isequal_Token(input, &expected)
+    cmp := isequal_Token(&result, &expected)
     tc.expect(t, cmp, fmt.tprintf("Expected:%v Got:%v", expected, input))
   }
 }
@@ -750,5 +717,39 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
     }
     tc.expect(t, false == doesSetTokenMatch(&stok, '\n'))
     tc.expect(t, true == doesSetTokenMatch(set_token = &stok, curr_rune = '\n', flags = {.DOTALL}))
+  }
+}
+
+@(test)
+test_parseTokensFromString :: proc(t: ^testing.T) {
+  using re
+  {
+    patterns := [?]string{"h{1,2}[a-b\\W](?:h)(?P<name>A)\\b.\\.+s?b*\n\\n\\\\", "(((a)(b)(c)?))"}
+    expected_num_tokens := [?]int{20, 14}
+    flags := [?]RegexFlags{{}, {.IGNORECASE}}
+    for pattern, idx in patterns {
+      for flag in flags {
+        toks, ok := parseTokensFromString(pattern, flag)
+        defer deleteTokens(&toks)
+        expected_num := expected_num_tokens[idx]
+        tc.expect(t, ok, "Expected parse to be ok")
+        cmp := len(toks) == expected_num
+        if !cmp {
+          fmt.printf("pattern: \"%v\" ok?% 5v Expected length:%v Got:%v\n", pattern, ok, expected_num, len(toks))
+          for tok, idx in toks {
+            fmt.printf("% 3d: %v\n", idx, tok)
+          }
+        }
+        tc.expect(t, cmp, fmt.tprintf("Expected %v tokens. Got %v", expected_num, len(toks)))
+      }
+    }
+  }
+  {
+    invalid_patterns := [?]string{"(", "((", ")", "?", "*", "+", "{1,4}", "a++"}
+    for pattern, idx in invalid_patterns {
+      toks, ok := parseTokensFromString(pattern)
+      tc.expect(t, !ok, "Expected parse to be not ok")
+      tc.expect(t, toks == nil, "Expected tokens to be nil")
+    }
   }
 }
