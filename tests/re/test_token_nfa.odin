@@ -14,9 +14,9 @@ import tc "tests:common"
 test_token_nfa :: proc(t: ^testing.T, verbose: bool = false) {
   using re
   context.allocator = context.temp_allocator
-  patterns := [?]string{"abc", "a(b)+", "a(cb+)+"} // "[ab]+(?P<name>[cd]?)*e{2,3}"}
-  expected_nfa_nodes := [?]int{5, 6, 7}
-  tc.expect(t, len(patterns) == len(expected_nfa_nodes), "Expected patterns lengtha and expected nfa lengths to be the same.")
+  patterns := [?]string{"abc", "a(b)+", "a(cb+)+", "[ab]+", "(?P<name>H+)*", "()", "(|)"} // "[ab]+(?P<name>[cd]?)*e{2,3}"}
+  expected_nfa_nodes := [?]int{5, 6, 7, 3, 5, 4, 5}
+  tc.expect(t, len(patterns) == len(expected_nfa_nodes), "Expected patterns length and expected nfa lengths to be the same.")
   for pattern, pattern_idx in patterns {
     nfa, nfa_ok := makeTokenNfaFromPattern(pattern, {})
     tc.expect(t, nfa_ok, "Expected nfa to be ok")

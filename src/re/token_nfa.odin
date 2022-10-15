@@ -288,32 +288,32 @@ _deletePostfixToNfaState :: proc(state: ^_PostfixToNfaState) {
 @(require_results)
 makeTokenNfaFromPostfixTokens :: proc(postfix_tokens: []Token, allocator := context.allocator) -> (out: TokenNfa, ok: bool) {
   // temp state
-  out = _makeTokenNfa(allocator)
+  out = _makeTokenNfa(allocator) // will persist, use regular allocator
   ok = true
   state := _makePostfixToNfaState(&out, context.temp_allocator)
-  defer _deletePostfixToNfaState(&state)
 
-  // With added head and tail the postfix expression implicitly looks like:
-  // Head (postfix expression) Tail Concat Concat
-  // queue.push_back(&state.stack, token)
-  Q.push_back(&state.frag_stack, _makeInitialFragment(out.head_index))
   for _, idx in postfix_tokens {
     if !_processToken(&state, &postfix_tokens[idx]) {
-      log.errorf("Error during processing token:%v. Unable to create NFA", postfix_tokens[idx])
+      log.errorf("Error during processing tokens[%v]: %v. Unable to create NFA", idx, postfix_tokens[idx])
       ok = false
       break
     }
   }
-  // now add tail and then two concats
-  Q.push_back(&state.frag_stack, _makeInitialFragment(out.tail_index))
-  // concats are implcit, and therefore don't show up in final NFA
-  concat_token: Token = SpecialToken{.CONCATENATION}
-  if ok && !_processToken(&state, &concat_token) {
+  // top of frag stack should now be the expression
+  if state.frag_stack.len < 1 {
+    // not enough fragments, this is odd
+    log.errorf("Not enough fragments after processing. This is odd. processing state:%v", state)
     ok = false
+    deleteTokenNfa(&out)
+    return
   }
-  if ok && !_processToken(&state, &concat_token) {
-    ok = false
-  }
+
+  head_frag := _makeInitialFragment(out.head_index)
+  expr_frag := Q.peek_back(&state.frag_stack)
+  _appendFragment(&head_frag, expr_frag, &state.nfa.digraph)
+  tail_frag := _makeInitialFragment(out.tail_index)
+  _appendFragment(&head_frag, &tail_frag, &state.nfa.digraph)
+
   // Check if head -> head; 
   if ok && set.contains(&out.digraph[out.head_index], out.head_index) {
     log.errorf("Error during processing. Head token points to head token. This is invalid")
@@ -331,62 +331,71 @@ _addTokenToStack :: proc(state: ^_PostfixToNfaState, token: ^Token, allocator :=
   Q.push_back(&state.frag_stack, _makeInitialFragment(index_key))
 }
 
-_processToken :: proc(state: ^_PostfixToNfaState, token: ^Token, allocator := context.allocator) -> bool {
+_processToken :: proc(state: ^_PostfixToNfaState, token: ^Token) -> bool {
   switch tok in token {
   // add token as-is
   case LiteralToken:
-    _addTokenToStack(state, token, allocator)
+    _addTokenToStack(state, token, context.temp_allocator)
   case SetToken:
-    _addTokenToStack(state, token, allocator)
+    _addTokenToStack(state, token, context.temp_allocator)
   case GroupBeginToken:
-    _addTokenToStack(state, token, allocator)
+    _addTokenToStack(state, token, context.temp_allocator)
   case GroupEndToken:
-    _addTokenToStack(state, token, allocator)
+    _addTokenToStack(state, token, context.temp_allocator)
   case SpecialToken:
     switch tok.op {
     case .CONCATENATION:
-      frag_right, pop_ok := Q.pop_back_safe(&state.frag_stack)
-      if !pop_ok {
-        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
+      if state.frag_stack.len < 2 {
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
         return false
       }
-      defer _deleteFragment(&frag_right)
+      frag_right, pop_ok := Q.pop_back_safe(&state.frag_stack)
+      if !pop_ok {
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
+        return false
+      }
       frag_left := Q.peek_back(&state.frag_stack)
       if frag_left == nil {
-        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
         return false
       }
       _appendFragment(frag_left, &frag_right, &state.nfa.digraph)
     case .HEAD:
       fallthrough
     case .TAIL:
-      _addTokenToStack(state, token, allocator)
+      _addTokenToStack(state, token, context.temp_allocator)
     }
   case OperationToken:
     switch tok.op {
     case .ALTERNATION:
-      frag_right, pop_ok := Q.pop_back_safe(&state.frag_stack)
-      if !pop_ok {
-        // "Stack size is insufficient for operation. Cannot create proper NFA with given sequence."
-        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
+      if state.frag_stack.len < 2 {
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
         return false
       }
-      defer _deleteFragment(&frag_right)
+      frag_right, pop_ok := Q.pop_back_safe(&state.frag_stack)
+      if !pop_ok {
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
+        return false
+      }
       frag_left := Q.peek_back(&state.frag_stack)
       if frag_left == nil {
-        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
         return false
       }
       _alternateFragment(frag_left, &frag_right)
     case .CARET:
       fallthrough
     case .DOLLAR:
-      _addTokenToStack(state, token, allocator)
+      _addTokenToStack(state, token, context.temp_allocator)
     }
   case QuantityToken:
+    if state.frag_stack.len < 1 {
+      log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
+      return false
+    }
     pfrag := Q.peek_back(&state.frag_stack)
     if pfrag == nil {
-      log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
+      log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)
       return false
     }
     return _repeatFragment(pfrag, state.nfa, tok.lower, (tok.upper.? or_else -1) - tok.lower)
