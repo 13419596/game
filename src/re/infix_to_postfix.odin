@@ -125,6 +125,7 @@ _pushTokenAndPossibleImplicitConcat :: proc(state: ^_InfixToPostfixState, token:
   append(&state.out_tokens, token)
   should_add := _shouldAddImplicitConcatenation(trailing_infix_tokens)
   if should_add {
+    log.debugf("Token:%v; adding implicit concat because of trailing token:%v", token, trailing_infix_tokens[0])
     _addOperator(state, concat_token)
   }
 }
@@ -133,6 +134,7 @@ _pushTokenAndPossibleImplicitConcat :: proc(state: ^_InfixToPostfixState, token:
 convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.allocator) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
   // converts infix tokens to postfix order. It assumes that the groupigns are balanced
   ok = true
+  log.debugf("Processing infix list:%v", infix_tokens)
   if len(infix_tokens) == 0 {
     log.debugf("List of infix tokens is empty. Returning empty postfix token list.")
     return

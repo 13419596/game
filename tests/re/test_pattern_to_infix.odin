@@ -473,7 +473,7 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
   using re
   {
     patterns := [?]string{"h{1,2}", "[a-b\\W]", "(?:h)", "(?P<name>A)\\b.\\.+s?b*\n\\n\\\\", "(((a)(b)(c)?))", "()"}
-    expected_num_tokens := [?]int{2, 1, 3, 14, 14, 2}
+    expected_num_tokens := [?]int{2, 1, 3, 14, 14, 2, 3}
     flags := [?]RegexFlags{{}, {.IGNORECASE}}
     for pattern, idx in patterns {
       for flag in flags {

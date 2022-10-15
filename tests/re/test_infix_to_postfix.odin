@@ -31,8 +31,8 @@ areTokenArraysEqual :: proc(lhs, rhs: []re.Token) -> bool {
 test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
   using re
   context.allocator = context.temp_allocator
-  patterns := [?]string{"(b|cd)", "abc", "a|bcd|e", "(a|bcd|e)", "a(b?)+", "[ab]+", "(a|b)?c", "a$b^c", "($a|a)^", "a(b+)+", "()"}
-  expected_num_infix_tokens := [?]int{6, 3, 7, 9, 6, 2, 7, 5, 7, 6, 2}
+  patterns := [?]string{"(b|cd)", "abc", "a|bcd|e", "(a|bcd|e)", "a(b?)+", "[ab]+", "(a|b)?c", "a$b^c", "($a|a)^", "a(b+)+", "()", "(a|b)"}
+  expected_num_infix_tokens := [?]int{6, 3, 7, 9, 6, 2, 7, 5, 7, 6, 2, 5}
   all_expected_postfix_tokens := [?][]Token{
     {
       GroupBeginToken{index = 0},
@@ -133,6 +133,15 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
     },
     {
       GroupBeginToken{index = 0},
+      GroupEndToken{index = 0},
+      SpecialToken{.CONCATENATION},
+    },
+    {
+      GroupBeginToken{index = 0},
+      LiteralToken{'a'},
+      LiteralToken{'b'},
+      OperationToken{.ALTERNATION},
+      SpecialToken{.CONCATENATION},
       GroupEndToken{index = 0},
       SpecialToken{.CONCATENATION},
     }
