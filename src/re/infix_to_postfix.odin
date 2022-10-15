@@ -1,5 +1,6 @@
 package re
 
+import "core:log"
 import Q "core:container/queue"
 
 _InfixToPostfixState :: struct {
@@ -133,6 +134,7 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
   // converts infix tokens to postfix order. It assumes that the groupigns are balanced
   ok = true
   if len(infix_tokens) == 0 {
+    log.debugf("List of infix tokens is empty. Returning empty postfix token list.")
     return
   }
   // temporary state 
@@ -144,6 +146,7 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
     switch tok in token {
     case SpecialToken:
       // shouldn't appear in input stream, but treat it the same as a regular literal token
+      log.infof("Got unexpected token:%v in infix list. Treating as a regular literal token", tok)
       _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
     case LiteralToken:
       _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
@@ -173,7 +176,7 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
           _addOperator(&state, &concat_token)
         }
         if !retrieved_begin {
-          // "Unbalanced parenthesis in expression. Cannot compute postfix expression.";
+          log.warnf("Unbalanced group. Cannot create valid postfix expression.")
           ok = false
           break loop
         }
@@ -193,6 +196,9 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
     }
   }
 
+  if !ok {
+    //return
+  }
   // finish it out by pushing all remaining ops to the output.
   for state.stack.len > 0 {
     append(&state.out_tokens, Q.pop_back(&state.stack))

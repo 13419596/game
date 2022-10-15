@@ -1,6 +1,7 @@
 package re
 
 import "core:fmt"
+import "core:log"
 import "core:strconv"
 import "core:strings"
 import "core:unicode"
@@ -525,7 +526,7 @@ parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.
 }
 
 @(require_results)
-parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: [dynamic]Token, ok: bool) {
+parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: [dynamic]Token, ok: bool) {
   out = make([dynamic]Token, allocator)
   ok = true
   pout := &out
@@ -536,13 +537,13 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
   group_index := 0
   group_index_stack := make([dynamic]int, context.temp_allocator)
   defer delete(group_index_stack)
-  loop: for head_idx < len(s) {
-    token, bytes_parsed, token_ok := parseSingleTokenFromString(s[head_idx:])
+  loop: for head_idx < len(pattern) {
+    token, bytes_parsed, token_ok := parseSingleTokenFromString(pattern[head_idx:])
     if !token_ok {
+      log.warnf("Unable to parse token at position:%v. pattern: \"%v\"", head_idx, pattern)
       ok = false
       break loop
     }
-    head_idx += bytes_parsed
 
     if case_insensitive {
       switch tok in &token {
@@ -569,6 +570,7 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
       pop_group_idx, pop_ok := pop_safe(&group_index_stack)
       if !pop_ok {
         // unbalanced levels
+        log.warnf("Extra group end ')' at index:%v. pattern: \"%v\"", head_idx, pattern)
         ok = false
         break loop
       }
@@ -582,21 +584,31 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
     }
 
     // Check that quantifier can't quantifier, group begin, or op
-    if _, qok := token.(QuantityToken); qok {
-      // current is Qtoken
+    if qtok, qok := token.(QuantityToken); qok {
+      // current is qtok
+      qtok_is_01 := qtok == QuantityToken{0, 1}
       if prev_token == nil {
         // cannot have quantifier right at the beginning, 
+        log.warnf("Nothing to repeat at position:%v. Quantifiers are not allowed at the beginning of a pattern. pattern: \"%v\"", head_idx, pattern)
         ok = false
         break loop
       } else {
         switch in prev_token {
         case QuantityToken:
+          if qtok_is_01 {
+            // TODO support lazy
+            log.warnf("Lazy quantifier at position:%v is not currently supported. pattern: \"%v\"", head_idx, pattern)
+          } else {
+            log.warnf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
+          }
           ok = false
           break loop
         case OperationToken:
+          log.warnf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
           ok = false
           break loop
         case GroupBeginToken:
+          log.warnf("Nothing to repeat at position:%v. Quantifier cannot appear at beginning of group. pattern: \"%v\"", head_idx, pattern)
           ok = false
           break loop
         case SpecialToken:
@@ -606,11 +618,12 @@ parseTokensFromString :: proc(s: string, flags: RegexFlags = {}, allocator := co
         }
       }
     }
+    head_idx += bytes_parsed
     append(&out, token)
     prev_token = token
   }
   if len(group_index_stack) != 0 {
-    // unbalanced
+    log.warnf("Too many group beginnings and not enough ends. pattern: \"%v\"", pattern)
     ok = false
   }
   if !ok {

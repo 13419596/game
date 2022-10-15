@@ -1,8 +1,10 @@
 package re
 
+import "core:fmt"
+import "core:log"
 import Q "core:container/queue"
 import set "game:container/set"
-import "core:fmt"
+import "game:glog"
 
 @(private)
 KeyType :: int
@@ -216,7 +218,14 @@ _repeatFragment :: proc(self: ^_Fragment, nfa: ^TokenNfa, num_copies: int, num_t
   if num_copies == 0 {
     self.has_bypass = true
   }
-  fmt.printf("Repeating fragment:%v \n nc:%v -- ntbc:%v\ndg:%v\n\n", self, num_copies, num_trailing_bypass_copies, nfa.digraph)
+  log.logf(
+    glog.DEBUG5,
+    "Repeating fragment:%v\nnum copies:%v; num trailing optional copies:%v\ncurrent NFA:%v",
+    self,
+    num_copies,
+    num_trailing_bypass_copies,
+    nfa.digraph,
+  )
   dg := &nfa.digraph
   initial_fragment := _copyFragment(self, context.temp_allocator)
   // note: if num_copies ==1 then don't add any copies
@@ -245,7 +254,7 @@ _repeatFragment :: proc(self: ^_Fragment, nfa: ^TokenNfa, num_copies: int, num_t
       _appendFragment(self, &dup_frag, dg)
     }
   }
-  fmt.printf("final frag:%v\n----------------\n", self)
+  log.debugf("Final repeated fragment:%v", self)
   return true
 }
 /////////////////////////
@@ -290,6 +299,7 @@ makeTokenNfaFromPostfixTokens :: proc(postfix_tokens: []Token, allocator := cont
   Q.push_back(&state.frag_stack, _makeInitialFragment(out.head_index))
   for _, idx in postfix_tokens {
     if !_processToken(&state, &postfix_tokens[idx]) {
+      log.errorf("Error during processing token:%v. Unable to create NFA", postfix_tokens[idx])
       ok = false
       break
     }
@@ -306,6 +316,7 @@ makeTokenNfaFromPostfixTokens :: proc(postfix_tokens: []Token, allocator := cont
   }
   // Check if head -> head; 
   if ok && set.contains(&out.digraph[out.head_index], out.head_index) {
+    log.errorf("Error during processing. Head token points to head token. This is invalid")
     ok = false
   }
   if !ok {
@@ -336,12 +347,13 @@ _processToken :: proc(state: ^_PostfixToNfaState, token: ^Token, allocator := co
     case .CONCATENATION:
       frag_right, pop_ok := Q.pop_back_safe(&state.frag_stack)
       if !pop_ok {
-        // "Stack size is insufficient for operation. Cannot create proper NFA with given sequence."
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
         return false
       }
       defer _deleteFragment(&frag_right)
       frag_left := Q.peek_back(&state.frag_stack)
       if frag_left == nil {
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
         return false
       }
       _appendFragment(frag_left, &frag_right, &state.nfa.digraph)
@@ -356,11 +368,13 @@ _processToken :: proc(state: ^_PostfixToNfaState, token: ^Token, allocator := co
       frag_right, pop_ok := Q.pop_back_safe(&state.frag_stack)
       if !pop_ok {
         // "Stack size is insufficient for operation. Cannot create proper NFA with given sequence."
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
         return false
       }
       defer _deleteFragment(&frag_right)
       frag_left := Q.peek_back(&state.frag_stack)
       if frag_left == nil {
+        log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
         return false
       }
       _alternateFragment(frag_left, &frag_right)
@@ -372,7 +386,7 @@ _processToken :: proc(state: ^_PostfixToNfaState, token: ^Token, allocator := co
   case QuantityToken:
     pfrag := Q.peek_back(&state.frag_stack)
     if pfrag == nil {
-      // "Stack size is insufficient for operation. Cannot create proper NFA with given sequence.
+      log.errorf("Error during processing. Not enough tokens in stack to create proper NFA.")
       return false
     }
     return _repeatFragment(pfrag, state.nfa, tok.lower, (tok.upper.? or_else -1) - tok.lower)
@@ -388,11 +402,10 @@ makeTokenNfaFromPattern :: proc(pattern: string, flags: RegexFlags = {}, allocat
     return
   }
   postfix_tokens, postfix_ok := convertInfixToPostfix(infix_tokens[:], context.temp_allocator)
-  fmt.printf("postfix toks:\n")
+  log.debugf("postfix toks:")
   for tok, idx in postfix_tokens {
-    fmt.printf("% 2d: %v\n", idx, tok)
+    log.debugf("% 2d: %v", idx, tok)
   }
-  fmt.printf("---------\n")
   if !postfix_ok {
     return
   }
