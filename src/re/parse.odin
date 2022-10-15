@@ -13,7 +13,7 @@ parseUnprefixedInt :: proc(str: string, n: ^int = nil) -> (value: int, ok: bool)
     return
   } else if (len_s >= 2 && str[0:2] == "00") {
     // no length or multiple leading 0's
-    log.debug("Unable to parse. Multiple leading zeros.")
+    log.debug("Unable to parse. Leading zeros are not allowed.")
     return
   }
 
@@ -32,7 +32,7 @@ parseUnprefixedInt :: proc(str: string, n: ^int = nil) -> (value: int, ok: bool)
     } else {
       // either end of number or never started
       if idx == 0 {
-        log.debug("Unable to parse. Invalid starting rune:'%v'.", rn)
+        log.debugf("Unable to parse. Invalid starting rune:'%v'.", rn)
         ok = false
         break
       } else {
