@@ -2,6 +2,7 @@
 package test_re
 
 import "core:fmt"
+import "core:log"
 import "core:sort"
 import "core:testing"
 import "core:unicode"
@@ -214,8 +215,8 @@ test_parseLatterSetToken :: proc(t: ^testing.T) {
       //   }
       //   quick_sort(e_tmp[:])
       //   quick_sort(t_tmp[:])
-      //   fmt.printf("Expected : %v\n", e_tmp)
-      //   fmt.printf("Got      : %v\n", t_tmp)
+      //   log.errorf("Expected : %v\n", e_tmp)
+      //   log.errorf("Got      : %v\n", t_tmp)
       // }
       tc.expect(t, cmp, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Got:%v", pattern, expected, tok))
     }
@@ -258,10 +259,10 @@ test_parseLatterGroupBeginToken :: proc(t: ^testing.T) {
       tc.expect(t, num_bytes_parsed == lengths[idx], fmt.tprintf("Expected length:%v; Got %v", lengths[idx], num_bytes_parsed))
       cmp := isequal_GroupBeginToken(&tok, &expected)
       // if !cmp {
-      //   fmt.printf(".index: %v == %v => %v\n",tok.index, expected.index, tok.index==expected.index)
-      //   fmt.printf(".mname: %v == %v => %v\n",tok.mname, expected.mname, tok.mname==expected.mname)
-      //   fmt.printf(".mname lhs: %v == nil => %v\n",tok.mname, tok.mname == nil)
-      //   fmt.printf(".mname rhs: %v == nil => %v\n",expected.mname, expected.mname == nil)
+      //   log.errorf(".index: %v == %v => %v\n",tok.index, expected.index, tok.index==expected.index)
+      //   log.errorf(".mname: %v == %v => %v\n",tok.mname, expected.mname, tok.mname==expected.mname)
+      //   log.errorf(".mname lhs: %v == nil => %v\n",tok.mname, tok.mname == nil)
+      //   log.errorf(".mname rhs: %v == nil => %v\n",expected.mname, expected.mname == nil)
       // }
       tc.expect(t, cmp, fmt.tprintf("Pattern:\"%v\"; Expected:%v; Got:%v", pattern, expected, tok))
     }
@@ -471,8 +472,8 @@ test_parseSingleTokenFromString :: proc(t: ^testing.T) {
 test_parseTokensFromString :: proc(t: ^testing.T) {
   using re
   {
-    patterns := [?]string{"h{1,2}", "[a-b\\W]", "(?:h)", "(?P<name>A)\\b.\\.+s?b*\n\\n\\\\", "(((a)(b)(c)?))"}
-    expected_num_tokens := [?]int{2, 1, 3, 14, 14}
+    patterns := [?]string{"h{1,2}", "[a-b\\W]", "(?:h)", "(?P<name>A)\\b.\\.+s?b*\n\\n\\\\", "(((a)(b)(c)?))", "()"}
+    expected_num_tokens := [?]int{2, 1, 3, 14, 14, 2}
     flags := [?]RegexFlags{{}, {.IGNORECASE}}
     for pattern, idx in patterns {
       for flag in flags {
@@ -482,9 +483,9 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         tc.expect(t, ok, fmt.tprintf("Expected parse to be ok for pattern:\"%v\"", pattern))
         cmp := len(toks) == expected_num
         if !cmp {
-          fmt.printf("pattern: \"%v\" ok?% 5v Expected length:%v Got:%v\n", pattern, ok, expected_num, len(toks))
+          log.errorf("pattern: \"%v\" ok?% 5v Expected length:%v Got:%v\n", pattern, ok, expected_num, len(toks))
           for tok, idx in toks {
-            fmt.printf("% 3d: %v\n", idx, tok)
+            log.errorf("% 3d: %v\n", idx, tok)
           }
         }
         tc.expect(t, cmp, fmt.tprintf("Expected %v tokens. Got %v", expected_num, len(toks)))

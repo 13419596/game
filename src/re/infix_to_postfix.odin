@@ -6,22 +6,22 @@ import Q "core:container/queue"
 _InfixToPostfixState :: struct {
   // internal data
   out_tokens: [dynamic]^Token,
-  stack:      Q.Queue(^Token),
+  op_stack:   Q.Queue(^Token),
 }
 
 @(require_results)
 _makeInfixToPostfixState :: proc(allocator := context.allocator) -> _InfixToPostfixState {
   out := _InfixToPostfixState {
     out_tokens = make([dynamic]^Token, allocator),
-    stack = Q.Queue(^Token){data = make([dynamic]^Token, allocator)},
+    op_stack = Q.Queue(^Token){data = make([dynamic]^Token, allocator)},
   }
-  Q.init(&out.stack)
+  Q.init(&out.op_stack)
   return out
 }
 
 @(private = "file")
 _deleteInfixToPostfixState :: proc(token_stack: ^_InfixToPostfixState) {
-  Q.destroy(&token_stack.stack)
+  Q.destroy(&token_stack.op_stack)
   delete(token_stack.out_tokens)
   token_stack.out_tokens = nil
 }
@@ -104,18 +104,18 @@ _addOperator :: proc(self: ^_InfixToPostfixState, token: ^Token) {
   // Shunting-yard alg. compares precedence levels of operator to be added and stack.
   token_pri := _getTokenPriorty(token)
   for {
-    if self.stack.len == 0 {
-      Q.push_back(&self.stack, token)
+    if self.op_stack.len == 0 {
+      Q.push_back(&self.op_stack, token)
       break
     }
-    top_stack_token := Q.peek_back(&self.stack)^
+    top_stack_token := Q.peek_back(&self.op_stack)^
     top_stack_pri := _getTokenPriorty(top_stack_token)
     if token_pri > top_stack_pri {
-      Q.push_back(&self.stack, token)
+      Q.push_back(&self.op_stack, token)
       break
     } else {
       // op stack is guaranteed to not be empty here
-      append(&self.out_tokens, Q.pop_back(&self.stack))
+      append(&self.out_tokens, Q.pop_back(&self.op_stack))
     }
   }
 }
@@ -155,21 +155,26 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
     case GroupBeginToken:
       // always push group begins
       append(&state.out_tokens, token)
-      Q.push_back(&state.stack, token) // push group begin sentinel so that group end knows how many symbols to pop
+      Q.push_back(&state.op_stack, token) // push group begin, so that group end knows how many symbols to pop
     case GroupEndToken:
       {
         // keep popping op stack till first group begin is found
         retrieved_begin := false
-        for state.stack.len > 0 {
-          back_token: ^Token = Q.pop_back(&state.stack)
+        for state.op_stack.len > 0 {
+          back_token: ^Token = Q.pop_back(&state.op_stack)
           if _, is_group_begin := back_token.(GroupBeginToken); is_group_begin {
             retrieved_begin = true
             break
           }
           append(&state.out_tokens, back_token)
         }
-        // always add concat, ), concat
-        append(&state.out_tokens, &concat_token)
+        if token_index > 0 {
+          // as long as previous token was not a group begin '(', add a concatenate
+          if _, gbok := infix_tokens[token_index - 1].(GroupBeginToken); !gbok {
+            append(&state.out_tokens, &concat_token)
+          }
+        }
+        // always add ), concat
         append(&state.out_tokens, token)
         append(&state.out_tokens, &concat_token)
         if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
@@ -200,8 +205,8 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
     //return
   }
   // finish it out by pushing all remaining ops to the output.
-  for state.stack.len > 0 {
-    append(&state.out_tokens, Q.pop_back(&state.stack))
+  for state.op_stack.len > 0 {
+    append(&state.out_tokens, Q.pop_back(&state.op_stack))
   }
 
   // copy data referenced by pointers to output
