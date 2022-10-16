@@ -537,8 +537,8 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
       {GroupBeginToken{index = 0}, ImplicitToken{.CONCATENATION}, GroupEndToken{}},
       {
         GroupBeginToken{index = 0},
-        ImplicitToken{.CONCATENATION},// "(((a)(b)(c)?))", 
-        GroupBeginToken{index = 1},
+        ImplicitToken{.CONCATENATION},
+        GroupBeginToken{index = 1},// "(((a)(b)(c)?))", 
         ImplicitToken{.CONCATENATION},
         GroupBeginToken{index = 2},
         ImplicitToken{.CONCATENATION},
