@@ -33,12 +33,27 @@ makeSetToken :: proc(
   return out
 }
 
+@(private)
+areTokenArraysEqual :: proc(lhs, rhs: []re.Token) -> bool {
+  using re
+  if len(lhs) != len(rhs) {
+    return false
+  }
+  for _, idx in lhs {
+    lv := &lhs[idx]
+    rv := &rhs[idx]
+    if !isequal_Token(lv, rv) {
+      return false
+    }
+  }
+  return true
+}
+
 @(test)
 test_match_token :: proc(t: ^testing.T) {
   test_makeCaseInsensitiveLiteral(t)
   test_updateSetTokenCaseInsensitive(t)
   test_doesSetTokenMatch(t)
-  test_parseTokensFromString(t)
 }
 
 

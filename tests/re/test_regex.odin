@@ -8,7 +8,6 @@ import "core:testing"
 import tc "tests:common"
 import "game:glog"
 
-
 main :: proc() {
   using glog
   t := testing.T{}
@@ -22,7 +21,7 @@ main :: proc() {
   test_parse(&t)
   test_match_token(&t)
   test_pattern_to_infix(&t)
-  test_infix_to_postfix(&t, true)
-  test_token_nfa(&t, true)
+  // test_infix_to_postfix(&t, true)
+  // test_token_nfa(&t, true)
   tc.report(&t)
 }

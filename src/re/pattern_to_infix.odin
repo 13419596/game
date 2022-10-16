@@ -437,7 +437,7 @@ _parseLatterGroupBeginToken :: proc(unparsed_runes: string, allocator := context
 }
 
 @(require_results)
-parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
+_parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.allocator) -> (out: Token, bytes_parsed: int, ok: bool) {
   using container_set
   defer if !ok {bytes_parsed = 0}
   bytes_parsed = 0
@@ -474,19 +474,17 @@ parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.
       out = GroupEndToken{}
       return
     case '^':
-      out = OperationToken {
+      out = AssertionToken {
         op = .CARET,
       }
       return
     case '$':
-      out = OperationToken {
+      out = AssertionToken {
         op = .DOLLAR,
       }
       return
     case '|':
-      out = OperationToken {
-        op = .ALTERNATION,
-      }
+      out = AlternationToken{}
       return
     case '?':
       out = QuantityToken {
@@ -525,6 +523,69 @@ parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context.
   return
 }
 
+
+@(require_results)
+_getImplicitTokens :: proc(token: Token, mprev_token: Maybe(Token), allocator := context.allocator) -> [dynamic]ImplicitToken {
+  prev_token, ptok := mprev_token.(Token)
+  if !ptok {
+    return {}
+  }
+
+  prev_is_literal_like := false
+  switch ptok in prev_token {
+  case SpecialNfaToken:
+  case ImplicitToken:
+  case AlternationToken:
+  case AssertionToken:
+  case GroupBeginToken:
+    prev_is_literal_like = true
+  case QuantityToken:
+    prev_is_literal_like = true
+  case GroupEndToken:
+    prev_is_literal_like = true
+  case SetToken:
+    prev_is_literal_like = true
+  case LiteralToken:
+    prev_is_literal_like = true
+  }
+
+  out := make([dynamic]ImplicitToken, allocator)
+
+  switch tok in token {
+  case SpecialNfaToken:
+    return nil
+  case ImplicitToken:
+    return nil
+  case AssertionToken:
+    return nil
+  case QuantityToken:
+    return nil
+  case AlternationToken:
+    if _, gbok := prev_token.(GroupBeginToken); gbok {
+      append(&out, ImplicitToken{.CONCATENATION})
+      append(&out, ImplicitToken{.EMPTY})
+    }
+  case GroupEndToken:
+    if _, altok := prev_token.(AlternationToken); altok {
+      append(&out, ImplicitToken{.EMPTY})
+    }
+    append(&out, ImplicitToken{.CONCATENATION})
+  case GroupBeginToken:
+    if prev_is_literal_like {
+      append(&out, ImplicitToken{.CONCATENATION})
+    }
+  case SetToken:
+    if prev_is_literal_like {
+      append(&out, ImplicitToken{.CONCATENATION})
+    }
+  case LiteralToken:
+    if prev_is_literal_like {
+      append(&out, ImplicitToken{.CONCATENATION})
+    }
+  }
+  return out
+}
+
 @(require_results)
 parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: [dynamic]Token, ok: bool) {
   out = make([dynamic]Token, allocator)
@@ -538,9 +599,9 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
   group_index_stack := make([dynamic]int, context.temp_allocator)
   defer delete(group_index_stack)
   loop: for head_idx < len(pattern) {
-    token, bytes_parsed, token_ok := parseSingleTokenFromString(pattern[head_idx:])
+    token, bytes_parsed, token_ok := _parseSingleTokenFromString(pattern[head_idx:])
     if !token_ok {
-      log.warnf("Unable to parse token at position:%v. pattern: \"%v\"", head_idx, pattern)
+      log.errorf("Unable to parse token at position:%v. pattern: \"%v\"", head_idx, pattern)
       ok = false
       break loop
     }
@@ -551,11 +612,13 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
         token = makeCaseInsensitiveLiteral(&tok, allocator)
       case SetToken:
         updateSetTokenCaseInsensitive(&tok)
-      case SpecialToken:
-      case OperationToken:
+      case SpecialNfaToken:
+      case AssertionToken:
       case QuantityToken:
       case GroupBeginToken:
       case GroupEndToken:
+      case AlternationToken:
+      case ImplicitToken:
       // do nothing
       }
     }
@@ -570,26 +633,28 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
       pop_group_idx, pop_ok := pop_safe(&group_index_stack)
       if !pop_ok {
         // unbalanced levels
-        log.warnf("Extra group end ')' at index:%v. pattern: \"%v\"", head_idx, pattern)
+        log.errorf("Extra group end ')' at index:%v. pattern: \"%v\"", head_idx, pattern)
         ok = false
         break loop
       }
       tok.index = pop_group_idx
-    case SpecialToken:
-    case OperationToken:
+    case SpecialNfaToken:
+    case AssertionToken:
     case QuantityToken:
     case SetToken:
     case LiteralToken:
+    case AlternationToken:
+    case ImplicitToken:
     // do nothing
     }
 
-    // Check that quantifier can't quantifier, group begin, or op
+    // Check that quantifier can't quantifier: group begin: or op
     if qtok, qok := token.(QuantityToken); qok {
       // current is qtok
       qtok_is_01 := qtok == QuantityToken{0, 1}
       if prev_token == nil {
-        // cannot have quantifier right at the beginning, 
-        log.warnf("Nothing to repeat at position:%v. Quantifiers are not allowed at the beginning of a pattern. pattern: \"%v\"", head_idx, pattern)
+        // cannot have quantifier right at the beginning: 
+        log.errorf("Nothing to repeat at position:%v. Quantifiers are not allowed at the beginning of a pattern. pattern: \"%v\"", head_idx, pattern)
         ok = false
         break loop
       } else {
@@ -597,33 +662,51 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
         case QuantityToken:
           if qtok_is_01 {
             // TODO support lazy
-            log.warnf("Lazy quantifier at position:%v is not currently supported. pattern: \"%v\"", head_idx, pattern)
+            log.errorf("Lazy quantifier at position:%v is not currently supported. pattern: \"%v\"", head_idx, pattern)
           } else {
-            log.warnf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
+            log.errorf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
           }
           ok = false
           break loop
-        case OperationToken:
-          log.warnf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
+        case AssertionToken:
+          log.errorf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
           ok = false
           break loop
         case GroupBeginToken:
-          log.warnf("Nothing to repeat at position:%v. Quantifier cannot appear at beginning of group. pattern: \"%v\"", head_idx, pattern)
+          log.errorf("Nothing to repeat at position:%v. Quantifier cannot appear at beginning of group. pattern: \"%v\"", head_idx, pattern)
           ok = false
           break loop
-        case SpecialToken:
+        case AlternationToken:
+          log.errorf("Nothing to repeat at position:%v. Quantifier cannot appear after alternation token. pattern: \"%v\"", head_idx, pattern)
+          ok = false
+          break loop
+        case SpecialNfaToken:
+          log.errorf("Should not encounter a token of type:%T when parsing infix tokens. pattern: \"%v\"", head_idx, SpecialNfaToken{}, pattern)
+          ok = false
+          break loop
+        case ImplicitToken:
+          log.errorf("Should not encounter a token of type:%T when parsing infix tokens. pattern: \"%v\"", head_idx, SpecialNfaToken{}, pattern)
+          ok = false
+          break loop
         case LiteralToken:
         case SetToken:
         case GroupEndToken:
+        // okay
         }
       }
     }
     head_idx += bytes_parsed
+
+    // Add implicit tokens
+    implicit_tokens := _getImplicitTokens(token = token, mprev_token = prev_token, allocator = context.temp_allocator)
+    for implicit_token in implicit_tokens {
+      append(&out, implicit_token)
+    }
     append(&out, token)
     prev_token = token
   }
   if len(group_index_stack) != 0 {
-    log.warnf("Too many group beginnings and not enough ends. pattern: \"%v\"", pattern)
+    log.errorf("Too many group beginnings and not enough ends. pattern: \"%v\"", pattern)
     ok = false
   }
   if !ok {

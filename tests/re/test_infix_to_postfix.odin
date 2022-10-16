@@ -11,21 +11,6 @@ import re "game:re"
 import container_set "game:container/set"
 import tc "tests:common"
 
-@(private)
-areTokenArraysEqual :: proc(lhs, rhs: []re.Token) -> bool {
-  using re
-  if len(lhs) != len(rhs) {
-    return false
-  }
-  for _, idx in lhs {
-    lv := &lhs[idx]
-    rv := &rhs[idx]
-    if !isequal_Token(lv, rv) {
-      return false
-    }
-  }
-  return true
-}
 
 @(test)
 test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
@@ -39,112 +24,108 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       LiteralToken{'b'},
       LiteralToken{'c'},
       LiteralToken{'d'},
-      SpecialToken{.CONCATENATION},
-      OperationToken{.ALTERNATION},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
+      AlternationToken{},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
     },
-    {LiteralToken{'a'}, LiteralToken{'b'}, SpecialToken{.CONCATENATION}, LiteralToken{'c'}, SpecialToken{.CONCATENATION}},
+    {LiteralToken{'a'}, LiteralToken{'b'}, ImplicitToken{.CONCATENATION}, LiteralToken{'c'}, ImplicitToken{.CONCATENATION}},
     {
       LiteralToken{'a'},
       LiteralToken{'b'},
       LiteralToken{'c'},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       LiteralToken{'d'},
-      SpecialToken{.CONCATENATION},
-      OperationToken{.ALTERNATION},
+      ImplicitToken{.CONCATENATION},
+      AlternationToken{},
       LiteralToken{'e'},
-      OperationToken{.ALTERNATION},
+      AlternationToken{},
     },
     {
       GroupBeginToken{index = 0},
       LiteralToken{'a'},
       LiteralToken{'b'},
       LiteralToken{'c'},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       LiteralToken{'d'},
-      SpecialToken{.CONCATENATION},
-      OperationToken{.ALTERNATION},
+      ImplicitToken{.CONCATENATION},
+      AlternationToken{},
       LiteralToken{'e'},
-      OperationToken{.ALTERNATION},
-      SpecialToken{.CONCATENATION},
+      AlternationToken{},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
     },
     {
       LiteralToken{'a'},
       GroupBeginToken{index = 0},
       LiteralToken{'b'},
       QuantityToken{0, 1},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       QuantityToken{1, nil},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
     },
     {makeSetToken("ab"), QuantityToken{1, nil}},
     {
       GroupBeginToken{index = 0},
       LiteralToken{'a'},
       LiteralToken{'b'},
-      OperationToken{.ALTERNATION},
-      SpecialToken{.CONCATENATION},
+      AlternationToken{},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       QuantityToken{0, 1},
       LiteralToken{'c'},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
     },
     {
       LiteralToken{'a'},
-      OperationToken{.DOLLAR},
-      SpecialToken{.CONCATENATION},
+      AssertionToken{.DOLLAR},
+      ImplicitToken{.CONCATENATION},
       LiteralToken{'b'},
-      SpecialToken{.CONCATENATION},
-      OperationToken{.CARET},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
+      AssertionToken{.CARET},
+      ImplicitToken{.CONCATENATION},
       LiteralToken{'c'},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
     },
     {
       GroupBeginToken{index = 0},
-      OperationToken{.DOLLAR},
+      AssertionToken{.DOLLAR},
       LiteralToken{'a'},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       LiteralToken{'a'},
-      OperationToken{.ALTERNATION},
-      SpecialToken{.CONCATENATION},
+      AlternationToken{},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
-      OperationToken{.CARET},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
+      AssertionToken{.CARET},
+      ImplicitToken{.CONCATENATION},
     },
     {
       LiteralToken{'a'},
       GroupBeginToken{index = 0},
       LiteralToken{'b'},
       QuantityToken{1, nil},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
       QuantityToken{1, nil},
-      SpecialToken{.CONCATENATION},
+      ImplicitToken{.CONCATENATION},
     },
-    {
-      GroupBeginToken{index = 0},
-      GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
-    },
+    {GroupBeginToken{index = 0}, GroupEndToken{index = 0}, ImplicitToken{.CONCATENATION}},
     {
       GroupBeginToken{index = 0},
       LiteralToken{'a'},
       LiteralToken{'b'},
-      OperationToken{.ALTERNATION},
-      SpecialToken{.CONCATENATION},
+      AlternationToken{},
+      ImplicitToken{.CONCATENATION},
       GroupEndToken{index = 0},
-      SpecialToken{.CONCATENATION},
-    }
+      ImplicitToken{.CONCATENATION},
+    },
   }
   tc.expect(t, len(patterns) == len(expected_num_infix_tokens), "Expected num patterns to be equal to num expected infix lengths")
   tc.expect(t, len(patterns) == len(all_expected_postfix_tokens), "Expected num patterns to be equal to num expected postfix patterns")
@@ -161,7 +142,7 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
     expected_postfix_tokens := all_expected_postfix_tokens[idx]
     defer deleteTokens(&postfix_tokens)
     cmp := areTokenArraysEqual(postfix_tokens[:], expected_postfix_tokens[:])
-    if !cmp  {
+    if !cmp {
       log.errorf("Pattern: \"%v\"", pattern)
       log.errorf("Infix Tokens:")
       for token, idx in infix_tokens {

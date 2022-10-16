@@ -7,27 +7,32 @@ import "core:unicode"
 import "core:unicode/utf8"
 import container_set "game:container/set"
 
-SpecialTokenType :: enum {
+SpecialNfaTokenType :: enum {
   // Special tokens for use in the NFA
   HEAD, // beginning of sequence
   TAIL, // end of sequence
-  CONCATENATION, // implicit
 }
 
-SpecialToken :: struct {
-  op: SpecialTokenType,
+SpecialNfaToken :: struct {
+  op: SpecialNfaTokenType,
 }
 
-OperationTokenType :: enum {
-  ALTERNATION, // |
-  // named as such because meaning should be end-of-entire-sequence or end-of-line
-  // depending on the regex flags
+ImplicitTokenType :: enum {
+  CONCATENATION, // ab -> a concat b
+  EMPTY, // for cases like (|) -> (empty) or  (a|) -> (a|empty)
+}
+
+ImplicitToken :: struct {
+  op: ImplicitTokenType,
+}
+
+AssertionTokenType :: enum {
   DOLLAR, // $,  
   CARET, // ^
 }
 
-OperationToken :: struct {
-  op: OperationTokenType,
+AssertionToken :: struct {
+  op: AssertionTokenType,
 }
 
 QuantityToken :: struct {
@@ -59,10 +64,16 @@ GroupEndToken :: struct {
   index: int,
 }
 
+AlternationToken :: struct {
+  op: int,
+}
+
 
 Token :: union {
-  SpecialToken,
-  OperationToken,
+  SpecialNfaToken,
+  ImplicitToken,
+  AssertionToken,
+  AlternationToken,
   GroupBeginToken,
   GroupEndToken,
   QuantityToken,
@@ -87,8 +98,10 @@ deleteGroupBeginToken :: proc(token: ^GroupBeginToken) {
 
 deleteToken :: proc(token: ^Token) {
   switch tok in token {
-  case SpecialToken:
-  case OperationToken:
+  case SpecialNfaToken:
+  case ImplicitToken:
+  case AlternationToken:
+  case AssertionToken:
   case GroupEndToken:
   case QuantityToken:
   case LiteralToken:
@@ -160,11 +173,15 @@ copy_Token :: proc(token: ^Token, allocator := context.allocator) -> Token {
     return copy_SetToken(&tok, allocator)
   case GroupBeginToken:
     return copy_GroupBeginToken(&tok, allocator)
+  case ImplicitToken:
+    return tok
+  case AlternationToken:
+    return tok
   case GroupEndToken:
     return tok
-  case SpecialToken:
+  case SpecialNfaToken:
     return tok
-  case OperationToken:
+  case AssertionToken:
     return tok
   case QuantityToken:
     return tok
@@ -200,12 +217,20 @@ isequal_Token :: proc(lhs, rhs: ^Token) -> bool {
     if rtok, ok := rhs.(GroupBeginToken); ok {
       return isequal_GroupBeginToken(&ltok, &rtok)
     }
-  case SpecialToken:
-    if rtok, ok := rhs.(SpecialToken); ok {
+  case ImplicitToken:
+    if rtok, ok := rhs.(ImplicitToken); ok {
       return ltok == rtok
     }
-  case OperationToken:
-    if rtok, ok := rhs.(OperationToken); ok {
+  case AlternationToken:
+    if rtok, ok := rhs.(AlternationToken); ok {
+      return ltok == rtok
+    }
+  case SpecialNfaToken:
+    if rtok, ok := rhs.(SpecialNfaToken); ok {
+      return ltok == rtok
+    }
+  case AssertionToken:
+    if rtok, ok := rhs.(AssertionToken); ok {
       return ltok == rtok
     }
   case GroupEndToken:

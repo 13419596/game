@@ -39,24 +39,19 @@ _getTokenPriorty :: proc(token: ^Token) -> int {
     return top
   case SetToken:
     return top
-  case SpecialToken:
+  case SpecialNfaToken:
+    return top
+  case AlternationToken:
+    return alternate
+  case ImplicitToken:
     switch tok.op {
-    case .HEAD:
-      return top
-    case .TAIL:
-      return top
     case .CONCATENATION:
       return concat
+    case .EMPTY:
+      return top
     }
-  case OperationToken:
-    switch tok.op {
-    case .ALTERNATION:
-      return alternate
-    case .DOLLAR:
-      return bottom
-    case .CARET:
-      return bottom
-    }
+  case AssertionToken:
+    return top
   case QuantityToken:
     return bottom
   case GroupBeginToken:
@@ -80,10 +75,17 @@ _shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
     //////////
     case GroupEndToken:
       return false
-    case OperationToken:
+    case AlternationToken:
+      return false
+    case ImplicitToken:
       switch tok.op {
-      case .ALTERNATION:
+      case .CONCATENATION:
         return false
+      case .EMPTY:
+        return true
+      }
+    case AssertionToken:
+      switch tok.op {
       case .DOLLAR:
         return true
       case .CARET:
@@ -91,7 +93,7 @@ _shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
       }
     case QuantityToken:
       return false
-    case SpecialToken:
+    case SpecialNfaToken:
       // special tokens only appear in the NFA
       return false
     }
@@ -142,11 +144,11 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
   // temporary state 
   state := _makeInfixToPostfixState(allocator = context.temp_allocator)
 
-  concat_token: Token = SpecialToken{.CONCATENATION}
+  concat_token: Token = ImplicitToken{.CONCATENATION}
   loop: for _, token_index in infix_tokens {
     token := &infix_tokens[token_index]
     switch tok in token {
-    case SpecialToken:
+    case SpecialNfaToken:
       // shouldn't appear in input stream, but treat it the same as a regular literal token
       log.infof("Got unexpected token:%v in infix list. Treating as a regular literal token", tok)
       _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
@@ -188,10 +190,8 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
           break loop
         }
       }
-    case OperationToken:
+    case AssertionToken:
       switch tok.op {
-      case .ALTERNATION:
-        _addOperator(&state, token)
       case .CARET:
         _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
       case .DOLLAR:
@@ -200,6 +200,15 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
     case QuantityToken:
       // quantity tokens tightly binds to previous token, so push token to output now.
       _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+    case AlternationToken:
+      _addOperator(&state, token)
+    case ImplicitToken:
+      switch tok.op {
+      case .CONCATENATION:
+        _addOperator(&state, token)
+      case .EMPTY:
+        _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+      }
     }
   }
 
