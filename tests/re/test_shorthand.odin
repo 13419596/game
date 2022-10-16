@@ -11,7 +11,6 @@ test_shorthand :: proc(t: ^testing.T) {
   test_isShorthandDigit(t)
   test_isShorthandWord(t)
   test_isShorthandWhitespace(t)
-  test_isShorthandBoundary(t)
 }
 
 @(test)
@@ -75,36 +74,5 @@ test_isShorthandWhitespace :: proc(t: ^testing.T) {
     tc.expect(t, isShorthandWhitespace(rn, false))
     tc.expect(t, matchesCharacterClass(rn, .Flag_S, {}, false))
     tc.expect(t, matchesCharacterClass(rn, .Flag_S, {}, true))
-  }
-}
-
-@(test)
-test_isShorthandBoundary :: proc(t: ^testing.T) {
-  using re
-  tc.expect(t, matchesCharacterClass({}, .Flag_B, {}, false, true, false))
-  tc.expect(t, matchesCharacterClass({}, .Flag_B, {}, false, false, true))
-  tc.expect(t, matchesCharacterClass({}, .Flag_B, {}, true, true, false))
-  tc.expect(t, matchesCharacterClass({}, .Flag_B, {}, true, false, true))
-  {
-    prev_rn := 'a'
-    for rn in "0123456789ab_" {
-      tc.expect(t, !matchesCharacterClass(rn, .Flag_B, prev_rn, false, false, false))
-      tc.expect(t, !matchesCharacterClass(rn, .Flag_B, prev_rn, true, false, false))
-    }
-    for rn in " !*\n" {
-      tc.expect(t, matchesCharacterClass(rn, .Flag_B, prev_rn, false, false, false))
-      tc.expect(t, matchesCharacterClass(rn, .Flag_B, prev_rn, true, false, false))
-    }
-  }
-  {
-    prev_rn := ' '
-    for rn in "0123456789ab_" {
-      tc.expect(t, matchesCharacterClass(rn, .Flag_B, prev_rn, false, false, false))
-      tc.expect(t, matchesCharacterClass(rn, .Flag_B, prev_rn, true, false, false))
-    }
-    for rn in " !*\n" {
-      tc.expect(t, !matchesCharacterClass(rn, .Flag_B, prev_rn, false, false, false))
-      tc.expect(t, !matchesCharacterClass(rn, .Flag_B, prev_rn, true, false, false))
-    }
   }
 }

@@ -85,12 +85,7 @@ _shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
         return true
       }
     case AssertionToken:
-      switch tok.op {
-      case .DOLLAR:
-        return true
-      case .CARET:
-        return true
-      }
+      return true
     case QuantityToken:
       return false
     case SpecialNfaToken:
@@ -191,12 +186,7 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
         }
       }
     case AssertionToken:
-      switch tok.op {
-      case .CARET:
-        _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
-      case .DOLLAR:
-        _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
-      }
+      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
     case QuantityToken:
       // quantity tokens tightly binds to previous token, so push token to output now.
       _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)

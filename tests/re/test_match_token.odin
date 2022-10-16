@@ -271,7 +271,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
     }
   }
   {
-    stok := makeSetToken(pos_sh = {.Flag_Dot})
+    stok := makeSetToken(pos_sh = {.Flag_Any})
     inputs := [?]rune{'a', 'b', 'c', 'A', 'B', '.', '!', ' ', '0'}
     for input, idx in inputs {
       expected := true

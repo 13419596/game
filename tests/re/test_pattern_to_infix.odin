@@ -113,8 +113,8 @@ test_parseLatterEscapedRune :: proc(t: ^testing.T) {
   }
   {
     // shorthand chars
-    class_chars := "bswd"
-    expected_classes := [?]ShortHandClass{.Flag_B, .Flag_S, .Flag_W, .Flag_D}
+    class_chars := "swd"
+    expected_classes := [?]ShortHandClass{.Flag_S, .Flag_W, .Flag_D}
     for to_upper in 0 ..= 1 {
       for initial_rn, idx in class_chars {
         rn := to_upper != 0 ? unicode.to_upper(initial_rn) : initial_rn
@@ -284,7 +284,7 @@ test__parseSingleTokenFromString :: proc(t: ^testing.T) {
   }
   {
     valid_patterns := [?]string {
-      // Quanity patterns
+      // Quantity patterns
       "{,}",
       "{0}",
       "{3}",
@@ -440,14 +440,14 @@ test__parseSingleTokenFromString :: proc(t: ^testing.T) {
       QuantityToken{0, nil},
       QuantityToken{1, nil},
       QuantityToken{0, 1},
-      SetToken{pos_shorthands = {.Flag_Dot}},
+      SetToken{pos_shorthands = {.Flag_Any}},
       AlternationToken{},
       GroupBeginToken{},
       GroupEndToken{},
       LiteralToken{'}'},
       LiteralToken{']'},
-      SetToken{pos_shorthands = {.Flag_B}},
-      SetToken{neg_shorthands = {.Flag_B}},
+      AssertionToken{.WORD_BOUNDARY},
+      AssertionToken{.NOT_WORD_BOUNDARY},
       SetToken{pos_shorthands = {.Flag_W}},
       SetToken{neg_shorthands = {.Flag_W}},
       SetToken{pos_shorthands = {.Flag_S}},
@@ -502,7 +502,7 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
   }
   // test patterns requiring empties
   {
-    patterns := [?]string{"(|)", "(a|)", "(|a)", "h{1,2}", "[a-b\\W]", "(?:h)", "()", "(((a)(b)(c)?))"}
+    patterns := [?]string{"(|)", "(a|)", "(|a)", "h{1,2}", "[a-b\\W]", "(?:h)", "()", "(((a)(b)(c)?))", "(?P<name>A).\\.+s?b*\n\\n\\\\"}
     all_expected_tokens := [?][]Token {
       {
         GroupBeginToken{index = 0},
@@ -538,11 +538,11 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
       {
         GroupBeginToken{index = 0},
         ImplicitToken{.CONCATENATION},
-        GroupBeginToken{index = 1},// "(((a)(b)(c)?))", 
+        GroupBeginToken{index = 1},
         ImplicitToken{.CONCATENATION},
         GroupBeginToken{index = 2},
         ImplicitToken{.CONCATENATION},
-        LiteralToken{'a'},
+        LiteralToken{'a'},// "(((a)(b)(c)?))", 
         ImplicitToken{.CONCATENATION},
         GroupEndToken{index = 2},
         ImplicitToken{.CONCATENATION},
@@ -562,6 +562,30 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         GroupEndToken{index = 1},
         ImplicitToken{.CONCATENATION},
         GroupEndToken{index = 0},
+      },
+      {
+        GroupBeginToken{mname = "name", index = 0},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'A'},
+        ImplicitToken{.CONCATENATION},
+        GroupEndToken{},
+        ImplicitToken{.CONCATENATION},
+        makeSetToken("", false, {.Flag_Any}, {}),// (?P<name>A).\\.+s?b*\n\\n\\\\
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'.'},
+        QuantityToken{1, nil},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'s'},
+        QuantityToken{0, 1},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'b'},
+        QuantityToken{0, nil},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'\n'},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'\n'},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'\\'},
       },
     }
     for pattern, idx in patterns {

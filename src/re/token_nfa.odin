@@ -387,12 +387,7 @@ _processToken :: proc(state: ^_PostfixToNfaState, token: ^Token) -> bool {
     }
     _alternateFragment(frag_left, &frag_right)
   case AssertionToken:
-    switch tok.op {
-    case .CARET:
-      fallthrough
-    case .DOLLAR:
-      _addTokenToStack(state, token, context.temp_allocator)
-    }
+    _addTokenToStack(state, token, context.temp_allocator)
   case QuantityToken:
     if state.frag_stack.len < 1 {
       log.errorf("Error during processing. Not enough tokens in stack to create proper NFA. processing state:%v", state)

@@ -29,6 +29,11 @@ ImplicitToken :: struct {
 AssertionTokenType :: enum {
   DOLLAR, // $,  
   CARET, // ^
+  WORD_BOUNDARY, // \b
+  // Before the first character in the string, if the first character is a word character.
+  // After the last character in the string, if the last character is a word character.
+  // Between two characters in the string, where one is a word character and the other is not a word character.
+  NOT_WORD_BOUNDARY, // \b
 }
 
 AssertionToken :: struct {
@@ -291,7 +296,7 @@ doesSetTokenMatch :: proc(
   if in_charset {
     return !set_token.set_negated
   }
-  if .Flag_Dot in set_token.pos_shorthands {
+  if .Flag_Any in set_token.pos_shorthands {
     return .DOTALL in flags ? true : curr_rune != '\n'
   }
   is_ascii := .ASCII in flags

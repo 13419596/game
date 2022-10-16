@@ -1,14 +1,10 @@
 package re
 
 ShortHandClass :: enum {
-  Flag_W,
-  Flag_D,
-  Flag_S,
-  Flag_B,
-  // Before the first character in the string, if the first character is a word character.
-  // After the last character in the string, if the last character is a word character.
-  // Between two characters in the string, where one is a word character and the other is not a word character.
-  Flag_Dot,
+  Flag_W, // \w
+  Flag_D, // \d
+  Flag_S, // \s
+  Flag_Any, // .
 }
 
 /* Generated from following script
@@ -1737,16 +1733,16 @@ matchesCharacterClass :: proc(
     return isShorthandDigit(rn = curr_rune, ascii = ascii)
   case .Flag_S:
     return isShorthandWhitespace(rn = curr_rune, ascii = ascii)
-  case .Flag_Dot:
+  case .Flag_Any:
     return curr_rune != '\n'
-  case .Flag_B:
-    if at_beginning || at_end {
-      return true
-    }
-    // not at beginning or end
-    token_is_word := isShorthandWord(rn = curr_rune, ascii = ascii)
-    prev_rune_is_word := isShorthandWord(rn = prev_rune, ascii = ascii)
-    return token_is_word != prev_rune_is_word
+  // case .Flag_B:
+  //   if at_beginning || at_end {
+  //     return true
+  //   }
+  //   // not at beginning or end
+  //   token_is_word := isShorthandWord(rn = curr_rune, ascii = ascii)
+  //   prev_rune_is_word := isShorthandWord(rn = prev_rune, ascii = ascii)
+  //   return token_is_word != prev_rune_is_word
   }
   return false
 }

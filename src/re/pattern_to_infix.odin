@@ -172,13 +172,9 @@ _parseLatterEscapedRune :: proc(rn: rune) -> (out: Token, bytes_parsed: int, ok:
     return
   case 'b', 'B':
     if is_negated {
-      out = SetToken {
-        neg_shorthands = {ShortHandClass.Flag_B},
-      }
+      out = AssertionToken{.NOT_WORD_BOUNDARY}
     } else {
-      out = SetToken {
-        pos_shorthands = {ShortHandClass.Flag_B},
-      }
+      out = AssertionToken{.WORD_BOUNDARY}
     }
     return
   ////////////
@@ -504,7 +500,7 @@ _parseSingleTokenFromString :: proc(unparsed_runes: string, allocator := context
       return
     case '.':
       out = SetToken {
-        pos_shorthands = {ShortHandClass.Flag_Dot},
+        pos_shorthands = {ShortHandClass.Flag_Any},
       }
       return
     case:
