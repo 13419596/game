@@ -8,6 +8,7 @@ import "core:unicode"
 import "core:unicode/utf8"
 import container_set "game:container/set"
 
+@(require_results)
 _parseLatterQuantityToken :: proc(unparsed_runes: string) -> (out: Token, bytes_parsed: int, ok: bool) {
   // parses starting after the first {
   ok = true
@@ -532,8 +533,8 @@ _getImplicitTokens :: proc(token: Token, mprev_token: Maybe(Token), allocator :=
   case SpecialNfaToken:
   case ImplicitToken:
   case AlternationToken:
-  case AssertionToken:
   case GroupBeginToken:
+  case AssertionToken:
     prev_is_literal_like = true
   case QuantityToken:
     prev_is_literal_like = true
@@ -547,37 +548,34 @@ _getImplicitTokens :: proc(token: Token, mprev_token: Maybe(Token), allocator :=
 
   out := make([dynamic]ImplicitToken, allocator)
 
+  can_add_concat := false
+
   switch tok in token {
-  case SpecialNfaToken:
-    return nil
-  case ImplicitToken:
-    return nil
-  case AssertionToken:
-    return nil
-  case QuantityToken:
-    return nil
   case AlternationToken:
     if _, gbok := prev_token.(GroupBeginToken); gbok {
-      append(&out, ImplicitToken{.CONCATENATION})
       append(&out, ImplicitToken{.EMPTY})
     }
   case GroupEndToken:
     if _, altok := prev_token.(AlternationToken); altok {
       append(&out, ImplicitToken{.EMPTY})
     }
-    append(&out, ImplicitToken{.CONCATENATION})
+  case SpecialNfaToken:
+  // do nothing
+  case ImplicitToken:
+  // do nothing
+  case QuantityToken:
+  // do nothing
+  case AssertionToken:
+    can_add_concat = true
   case GroupBeginToken:
-    if prev_is_literal_like {
-      append(&out, ImplicitToken{.CONCATENATION})
-    }
+    can_add_concat = true
   case SetToken:
-    if prev_is_literal_like {
-      append(&out, ImplicitToken{.CONCATENATION})
-    }
+    can_add_concat = true
   case LiteralToken:
-    if prev_is_literal_like {
-      append(&out, ImplicitToken{.CONCATENATION})
-    }
+    can_add_concat = true
+  }
+  if can_add_concat && prev_is_literal_like {
+    append(&out, ImplicitToken{.CONCATENATION})
   }
   return out
 }

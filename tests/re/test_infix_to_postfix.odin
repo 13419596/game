@@ -17,7 +17,6 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
   using re
   context.allocator = context.temp_allocator
   patterns := [?]string{"(b|cd)", "abc", "a|bcd|e", "(a|bcd|e)", "a(b?)+", "[ab]+", "(a|b)?c", "a$b^c", "($a|a)^", "a(b+)+", "()", "(a|b)"}
-  expected_num_infix_tokens := [?]int{6, 3, 7, 9, 6, 2, 7, 5, 7, 6, 2, 5}
   all_expected_postfix_tokens := [?][]Token{
     {
       GroupBeginToken{index = 0},
@@ -127,17 +126,11 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       ImplicitToken{.CONCATENATION},
     },
   }
-  tc.expect(t, len(patterns) == len(expected_num_infix_tokens), "Expected num patterns to be equal to num expected infix lengths")
   tc.expect(t, len(patterns) == len(all_expected_postfix_tokens), "Expected num patterns to be equal to num expected postfix patterns")
   for pattern, idx in patterns {
     infix_tokens, infix_ok := parseTokensFromString(pattern)
     defer deleteTokens(&infix_tokens)
     tc.expect(t, infix_ok, "Expected parse to be ok")
-    tc.expect(
-      t,
-      len(infix_tokens) == expected_num_infix_tokens[idx],
-      fmt.tprintf("Expected %v infix tokens. Got %v", expected_num_infix_tokens[idx], len(infix_tokens)),
-    )
     postfix_tokens, postfix_ok := convertInfixToPostfix(infix_tokens[:])
     expected_postfix_tokens := all_expected_postfix_tokens[idx]
     defer deleteTokens(&postfix_tokens)
@@ -148,7 +141,7 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
       for token, idx in infix_tokens {
         log.errorf(" % 2d: %v", idx, token)
       }
-      log.errorf("\nPostfix Tokens:")
+      log.errorf("Postfix Tokens:")
       for _, idx in 0 ..< max(len(postfix_tokens), len(expected_postfix_tokens)) {
         log.errorf("% 2d: ", idx)
         if idx < len(postfix_tokens) {

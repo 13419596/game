@@ -62,40 +62,6 @@ _getTokenPriorty :: proc(token: ^Token) -> int {
   return bottom
 }
 
-@(require_results)
-_shouldAddImplicitConcatenation :: proc(tokens: []Token) -> bool {
-  for token in tokens {
-    switch tok in token {
-    case LiteralToken:
-      return true
-    case SetToken:
-      return true
-    case GroupBeginToken:
-      return true
-    //////////
-    case GroupEndToken:
-      return false
-    case AlternationToken:
-      return false
-    case ImplicitToken:
-      switch tok.op {
-      case .CONCATENATION:
-        return false
-      case .EMPTY:
-        return true
-      }
-    case AssertionToken:
-      return true
-    case QuantityToken:
-      return false
-    case SpecialNfaToken:
-      // special tokens only appear in the NFA
-      return false
-    }
-  }
-  return false
-}
-
 @(private = "file")
 _addOperator :: proc(self: ^_InfixToPostfixState, token: ^Token) {
   // Shunting-yard alg. compares precedence levels of operator to be added and stack.
@@ -117,15 +83,8 @@ _addOperator :: proc(self: ^_InfixToPostfixState, token: ^Token) {
   }
 }
 
-@(private = "file")
-_pushTokenAndPossibleImplicitConcat :: proc(state: ^_InfixToPostfixState, token: ^Token, trailing_infix_tokens: []Token, concat_token: ^Token) {
-  append(&state.out_tokens, token)
-  should_add := _shouldAddImplicitConcatenation(trailing_infix_tokens)
-  if should_add {
-    log.debugf("Token:%v; adding implicit concat because of trailing token:%v", token, trailing_infix_tokens[0])
-    _addOperator(state, concat_token)
-  }
-}
+//
+// append(&state.out_tokens, token)
 
 @(require_results)
 convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.allocator) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
@@ -146,11 +105,11 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
     case SpecialNfaToken:
       // shouldn't appear in input stream, but treat it the same as a regular literal token
       log.infof("Got unexpected token:%v in infix list. Treating as a regular literal token", tok)
-      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+      append(&state.out_tokens, token)
     case LiteralToken:
-      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+      append(&state.out_tokens, token)
     case SetToken:
-      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+      append(&state.out_tokens, token)
     case GroupBeginToken:
       // always push group begins
       append(&state.out_tokens, token)
@@ -167,6 +126,11 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
           }
           append(&state.out_tokens, back_token)
         }
+        if !retrieved_begin || len(state.out_tokens) < 1 {
+          log.warnf("Unbalanced group. Cannot create valid postfix expression.")
+          ok = false
+          break loop
+        }
         if token_index > 0 {
           // as long as previous token was not a group begin '(', add a concatenate
           if _, gbok := infix_tokens[token_index - 1].(GroupBeginToken); !gbok {
@@ -176,20 +140,12 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
         // always add ), concat
         append(&state.out_tokens, token)
         append(&state.out_tokens, &concat_token)
-        if _shouldAddImplicitConcatenation(infix_tokens[token_index + 1:]) {
-          _addOperator(&state, &concat_token)
-        }
-        if !retrieved_begin {
-          log.warnf("Unbalanced group. Cannot create valid postfix expression.")
-          ok = false
-          break loop
-        }
       }
     case AssertionToken:
-      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+      append(&state.out_tokens, token)
     case QuantityToken:
       // quantity tokens tightly binds to previous token, so push token to output now.
-      _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+      append(&state.out_tokens, token)
     case AlternationToken:
       _addOperator(&state, token)
     case ImplicitToken:
@@ -197,7 +153,7 @@ convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.alloca
       case .CONCATENATION:
         _addOperator(&state, token)
       case .EMPTY:
-        _pushTokenAndPossibleImplicitConcat(&state, token, infix_tokens[token_index + 1:], &concat_token)
+        append(&state.out_tokens, token)
       }
     }
   }
