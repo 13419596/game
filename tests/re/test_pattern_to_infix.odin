@@ -548,8 +548,8 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         LiteralToken{'\n'},
         ImplicitToken{.CONCATENATION},
         LiteralToken{'\n'},
-        ImplicitToken{.CONCATENATION},// (?P<name>A).\\.+s?b*\n\\n\\\\
-        LiteralToken{'\\'},
+        ImplicitToken{.CONCATENATION},
+        LiteralToken{'\\'},// (?P<name>A).\\.+s?b*\n\\n\\\\
       },
       {
         LiteralToken{'a'},
