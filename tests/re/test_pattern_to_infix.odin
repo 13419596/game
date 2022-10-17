@@ -518,7 +518,7 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         LiteralToken{'a'},
         GroupEndToken{index = 2},
         ImplicitToken{.CONCATENATION},
-        GroupBeginToken{index = 3},// "(((a)(b)(c)?))", 
+        GroupBeginToken{index = 3},
         LiteralToken{'b'},
         GroupEndToken{index = 3},
         ImplicitToken{.CONCATENATION},
@@ -528,10 +528,10 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         QuantityToken{0, 1},
         GroupEndToken{index = 1},
         GroupEndToken{index = 0},
-      },
+      }, // "(((a)(b)(c)?))", 
       {
         GroupBeginToken{mname = "name", index = 0},
-        LiteralToken{'A'},// (?P<name>A).\\.+s?b*\n\\n\\\\
+        LiteralToken{'A'},
         GroupEndToken{},
         ImplicitToken{.CONCATENATION},
         makeSetToken("", false, {.Flag_Any}, {}),
@@ -548,12 +548,12 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         LiteralToken{'\n'},
         ImplicitToken{.CONCATENATION},
         LiteralToken{'\n'},
-        ImplicitToken{.CONCATENATION},
+        ImplicitToken{.CONCATENATION},// (?P<name>A).\\.+s?b*\n\\n\\\\
         LiteralToken{'\\'},
       },
       {
         LiteralToken{'a'},
-        ImplicitToken{.CONCATENATION},// a$b^c
+        ImplicitToken{.CONCATENATION},
         AssertionToken{.DOLLAR},
         ImplicitToken{.CONCATENATION},
         LiteralToken{'b'},
@@ -561,7 +561,7 @@ test_parseTokensFromString :: proc(t: ^testing.T) {
         AssertionToken{.CARET},
         ImplicitToken{.CONCATENATION},
         LiteralToken{'c'},
-      },
+      }, // a$b^c
     }
     for pattern, idx in patterns {
       toks, ok := parseTokensFromString(pattern)

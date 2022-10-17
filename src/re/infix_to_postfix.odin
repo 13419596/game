@@ -90,7 +90,6 @@ _addOperator :: proc(self: ^_InfixToPostfixState, token: ^Token) {
 convertInfixToPostfix :: proc(infix_tokens: []Token, allocator := context.allocator) -> (out_postfix_tokens: [dynamic]Token, ok: bool) {
   // converts infix tokens to postfix order. It assumes that the groupigns are balanced
   ok = true
-  log.debugf("Processing infix list:%v", infix_tokens)
   if len(infix_tokens) == 0 {
     log.debugf("List of infix tokens is empty. Returning empty postfix token list.")
     return

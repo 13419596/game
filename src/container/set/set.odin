@@ -1,17 +1,22 @@
 package container_set
 
+import "core:log"
+
 @(private = "file")
 DEFAULT_RESERVE_CAPACITY :: 16
 
+@(private = "file")
+ValueType :: distinct [0]int
+
 Set :: struct($T: typeid) {
   // no built-in set type, so use a map instead
-  set: map[T]any,
+  set: map[T]ValueType,
 }
 
 @(require_results)
 makeSet :: proc($T: typeid, cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> Set(T) {
   out := Set(T) {
-    set = make(map[T]any, max(1, cap), allocator, loc),
+    set = make(map[T]ValueType, max(1, cap), allocator, loc),
   }
   return out
 }
@@ -62,6 +67,9 @@ copy :: proc(self: ^$S/Set($T), allocator := context.allocator) -> Set(T) {
 
 @(require_results)
 asArray :: proc(self: ^$S/Set($T), allocator := context.allocator, loc := #caller_location) -> [dynamic]T {
+  if self == nil {
+    log.panicf("Received null pointer for self. self:%v", self)
+  }
   out := make([dynamic]T, 0, len(self.set), context.allocator, loc)
   for item, _ in self.set {
     append(&out, item)
@@ -76,7 +84,7 @@ size :: proc(self: ^$S/Set($T)) -> int {
 //////////////////////////////////////////////
 
 add :: proc(self: ^$S/Set($T), item: T) {
-  self.set[item] = nil
+  self.set[item] = {}
 }
 
 // removes an element from the list, returns True if discarded, false if element was not present
@@ -118,21 +126,21 @@ pop_safe :: proc(self: ^$S/Set($T)) -> (elem: T, ok: bool) {
 @(private)
 update_set :: proc(self, other: ^$S/Set($T)) {
   for item, _ in other.set {
-    self.set[item] = nil // add item
+    self.set[item] = {} // add item
   }
 }
 
 @(private)
 update_slice :: proc(self: ^$S/Set($T), items: $A/[]T) {
   for item in items {
-    self.set[item] = nil // add item
+    self.set[item] = {} // add item
   }
 }
 
 @(private)
 update_array :: proc(self: ^$S/Set($T), items: $A/[$N]T) {
   for item in items {
-    self.set[item] = nil // add item
+    self.set[item] = {} // add item
   }
 }
 
