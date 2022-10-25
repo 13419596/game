@@ -15,7 +15,7 @@ test_Trie :: proc(t: ^testing.T) {
   test_setItem(t)
   test_discard(t)
   test_getLongestPrefix(t)
-  test_getAllKeyValues(t)
+  test_getAllValues(t)
 }
 
 @(test)
@@ -111,23 +111,46 @@ test_getLongestPrefix :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_getAllKeyValues :: proc(t: ^testing.T) {
+test_getAllValues :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
   setItem(&tr, "abcdef", 0)
-  setItem(&tr, "abcdefffffffffffffff", 10)
   setItem(&tr, "abcde", 1)
   setItem(&tr, "abcd", 2)
-  setItem(&tr, "abcU", 3)
-  /*
+  setItem(&tr, "AbcU", 3)
+  setItem(&tr, "AbcUUUUU", 4)
+  {
+    s := pformatTrie(&tr)
+    defer delete(s)
+    log.debugf("Trie:\n%v", s)
+    tc.expect(t, len(s) > 3)
+  }
+  {
+    values := getAllValues(&tr)
+    defer delete(values)
+    tc.expect(t, len(values) == 5)
+  }
+  {
+    keys := getAllKeys(&tr)
+    defer {
+      for k in &keys {
+        delete(k)
+      }
+      delete(keys)
+    }
+    log.debugf("KEYS:\n%v", keys)
+    tc.expect(t, len(keys) == 5)
+  }
   {
     kvs := getAllKeyValues(&tr)
-    for kv in &kvs {
-      defer deleteTrieKeyValue(&kv)
+    defer {
+      for kv in &kvs {
+        deleteTrieKeyValue(&kv)
+      }
+      delete(kvs)
     }
+    log.debugf("KEY-VALUES:\n%v", kvs)
     tc.expect(t, len(kvs) == 5)
   }
-  setItem(&tr, "abcU", 99)
-  */
 }

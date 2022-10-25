@@ -32,22 +32,6 @@ _deleteTrieNode :: proc(self: ^$T/_TrieNode($K, $V)) {
   self.children = {}
 }
 
-_getTotalValues :: proc(self: ^$T/_TrieNode($K, $V), depth: int = 0) -> int {
-  total := 0
-  if self == nil {
-    return total
-  }
-  if _, ok := self.value.(V); ok {
-    total += 1
-  }
-  if len(self.children) <= 0 {
-    return total
-  }
-  for k, v in &self.children {
-    total += _getTotalValues(&v, depth + 1)
-  }
-  return total
-}
 
 _recursePrintNode :: proc(self: ^$T/_TrieNode($K, $V), depth: int = 0) {
   if self == nil {

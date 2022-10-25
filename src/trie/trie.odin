@@ -1,8 +1,10 @@
 package trie
 
+import "core:fmt"
 import "core:intrinsics"
 import "core:log"
 import "core:runtime"
+import "core:strings"
 import Q "core:container/queue"
 
 
@@ -74,10 +76,6 @@ getLongestPrefix :: proc {
   _getLongestPrefix_int_string,
 }
 
-getNumValues :: proc(self: ^$T/Trie($K, $V)) -> int {
-  // Returns the number of nodes in the trie. 
-  return _getTotalValues(&self.root)
-}
 
 @(private)
 _discard :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
@@ -165,13 +163,145 @@ setItem :: proc {
   _setItem,
 }
 
-
+///////////////////////////////////////////////////////////////////////////
 @(private = "file")
 _StackItem :: struct($K, $V: typeid) {
-  key:   [dynamic]K,
-  node:  ^_TrieNode(K, V),
-  depth: int,
+  // assumes that the stack item will be allocated via temp_allocator,
+  // and thus will not need to be de-allocated
+  key:          [dynamic]K,
+  node:         ^_TrieNode(K, V),
+  depth:        int,
+  child_index:  int,
+  num_children: int,
+  mprefix:      Maybe(string),
 }
+
+getNumValues :: proc(self: ^$T/Trie($K, $V)) -> int {
+  // Returns the number of nodes in the trie. 
+  total := 0
+  S :: _StackItem(K, V)
+  stack := Q.Queue(S) {
+    data = make([dynamic]S, context.temp_allocator),
+  }
+  Q.init(&stack)
+  Q.push_back(&stack, S{node = &self.root})
+  for stack.len > 0 {
+    item := Q.pop_back(&stack)
+    if value, ok := item.node.value.?; ok {
+      total += 1
+    }
+    for k, node in &item.node.children {
+      Q.push_back(&stack, S{node = &node})
+    }
+  }
+  return total
+}
+
+@(require_results)
+pformatTrie :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> string {
+  using strings
+  out_lines := make([dynamic]string, context.temp_allocator)
+  S :: _StackItem(K, V)
+  stack := Q.Queue(S) {
+    data = make([dynamic]S, context.temp_allocator),
+  }
+  Q.init(&stack)
+  Q.push_back(&stack, S{node = &self.root, mprefix = ""})
+  for stack.len > 0 {
+    item := Q.pop_back(&stack)
+    prefix := item.mprefix.? or_else ""
+    if item.depth > 0 {
+      line := make([dynamic]string, context.temp_allocator)
+      append(&line, prefix)
+      if item.child_index + 1 >= item.num_children {
+        // last child
+        prefix = fmt.tprintf("%v  ", prefix)
+        append(&line, "└")
+      } else {
+        prefix = fmt.tprintf("%v| ", prefix)
+        append(&line, "├")
+      }
+      append(&line, "── ")
+      when K == rune {
+        append(&line, fmt.tprintf("'%v'", item.node.key))
+      } else {
+        append(&line, fmt.tprintf("%v", item.node.key))
+      }
+      if value, ok := item.node.value.?; ok {
+        when V == rune {
+          append(&line, fmt.tprintf(": '%v'", item.node.value))
+        } else {
+          append(&line, fmt.tprintf(": %v", item.node.value))
+        }
+      }
+      append(&out_lines, join(line[:], "", context.temp_allocator))
+    }
+    child_idx := 0
+    num_children := len(item.node.children)
+    for k, node in &item.node.children {
+      // reverse indicies because children are pushed onto a stack
+      Q.push_back(&stack, S{{}, &node, item.depth + 1, num_children - child_idx - 1, num_children, prefix})
+      child_idx += 1
+    }
+  }
+  out := join(out_lines[:], "\n", allocator)
+  return out
+}
+
+getAllValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []V {
+  // Returns all the values stored in the trie
+  out := make([dynamic]V, allocator)
+  S :: _StackItem(K, V)
+  stack := Q.Queue(S) {
+    data = make([dynamic]S, context.temp_allocator),
+  }
+  Q.init(&stack)
+  Q.push_back(&stack, S{node = &self.root})
+  for stack.len > 0 {
+    item := Q.pop_back(&stack)
+    if value, ok := item.node.value.?; ok {
+      append(&out, value)
+    }
+    for k, node in &item.node.children {
+      Q.push_back(&stack, S{node = &node})
+    }
+  }
+  return out[:]
+}
+
+getAllKeys :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> [][]K {
+  // returns all keys with values in the trie
+  out := make([dynamic][]K, allocator)
+  S :: _StackItem(K, V)
+  stack := Q.Queue(S) {
+    data = make([dynamic]S, context.temp_allocator),
+  }
+  Q.init(&stack)
+  Q.push_back(&stack, S{node = &self.root})
+  for stack.len > 0 {
+    item := Q.pop_back(&stack)
+    if value, ok := item.node.value.?; ok {
+      // allocate final key
+      out_key := make([dynamic]K, len(item.key), allocator)
+      for k, i in item.key {
+        out_key[i] = k
+      }
+      append(&out, out_key[:])
+    }
+    for last_k, node in &item.node.children {
+      next_key := make(T = [dynamic]K, len = len(item.key) + 1, allocator = context.temp_allocator)
+      for k, i in item.key {
+        next_key[i] = k
+      }
+      if len(next_key) > 0 {
+        next_key[len(next_key) - 1] = last_k
+      }
+      Q.push_back(&stack, S{node = &node, key = next_key, depth = item.depth + 1})
+    }
+  }
+  return out[:]
+}
+
 
 TrieKeyValue :: struct($K, $V: typeid) {
   key:   []K,
@@ -185,39 +315,37 @@ deleteTrieKeyValue :: proc(kv: ^$T/TrieKeyValue($K, $V)) {
   delete(kv.key)
 }
 
-/*
-getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []TrieKeyValue(K,V) {
-  out := make([dynamic]TrieKeyValue(K,V), allocator)
-  stack := Q.Queue(_StackItem(K, V)) {
-    data = make([dynamic]_StackItem(K, V), context.temp_allocator),
+getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []TrieKeyValue(K, V) {
+  // returns all keys with values in the trie
+  out := make([dynamic]TrieKeyValue(K, V), allocator)
+  S :: _StackItem(K, V)
+  stack := Q.Queue(S) {
+    data = make([dynamic]S, context.temp_allocator),
   }
-  Q.init(q = &stack, allocator=context.temp_allocator)
-  Q.push_back(&stack, _StackItem(K, V){node = &self.root})
+  Q.init(&stack)
+  Q.push_back(&stack, S{node = &self.root})
   for stack.len > 0 {
     item := Q.pop_back(&stack)
     if value, ok := item.node.value.?; ok {
-      k := make([dynamic]K)
-      k = item.key
-      append(&out, TrieKeyValue(K,V){})
-      append(&out_k, k)
-      append(&out_v, value)
+      // allocate final key
+      out_key := make([dynamic]K, len(item.key), allocator)
+      for k, i in item.key {
+        out_key[i] = k
+      }
+      append(&out, TrieKeyValue(K, V){key = out_key[:], value = value})
     }
-    for next_k, node in &item.node.children {
-      next_item := _StackItem(K, V){
-        node = &node,
-        depth=        item.depth+1,
+    for last_k, node in &item.node.children {
+      next_key := make(T = [dynamic]K, len = len(item.key) + 1, allocator = context.temp_allocator)
+      for k, i in item.key {
+        next_key[i] = k
       }
-      if item.depth>0 {
-        next_item.key  =make([dynamic]K,len(item.key)+1, context.temp_allocator)
-        for k,i in item.key {
-          next_item.key[i] = k
-        }
-        next_item.key[len(next_item.key)-1] = next_k
+      if len(next_key) > 0 {
+        next_key[len(next_key) - 1] = last_k
       }
-      Q.push_back(&stack, next_item)
+      Q.push_back(&stack, S{node = &node, key = next_key, depth = item.depth + 1})
     }
   }
-  return out_k,out_v
+  return out[:]
 }
 
-*/
+// TODO - get all values after prefix
