@@ -1,10 +1,13 @@
 // Tests "game:regex/infix_to_postfix"
 // Must be run with `-collection:tests=` flag
-package test_re
+package test_trie
 
+import "core:fmt"
 import "core:log"
+import "core:strings"
 import "core:runtime"
 import "core:testing"
+import "game:trie"
 import tc "tests:common"
 
 main :: proc() {
@@ -15,12 +18,7 @@ main :: proc() {
   defer log.destroy_multi_logger(&multi_logger)
   context.logger = multi_logger
 
-  test_shorthand(&t)
-  test_parse(&t)
-  test_match_token(&t)
-  test_pattern_to_infix(&t)
-  test_infix_to_postfix(&t, true)
-  log.debugf("---------------------------------------------------------")
-  test_token_nfa(&t, true)
+  test_TrieNode(&t)
+  test_Trie(&t)
   tc.report(&t)
 }
