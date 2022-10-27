@@ -13,7 +13,8 @@ import tc "tests:common"
 test_Trie :: proc(t: ^testing.T) {
   test_makeTrie(t)
   test_setItem(t)
-  test_discard(t)
+  test_discardItem(t)
+  test_containsKey(t)
   test_getLongestPrefix(t)
   test_getAllValues(t)
 }
@@ -71,7 +72,7 @@ test_setItem :: proc(t: ^testing.T) {
 
 
 @(test)
-test_discard :: proc(t: ^testing.T) {
+test_discardItem :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
@@ -79,13 +80,41 @@ test_discard :: proc(t: ^testing.T) {
   setItem(&tr, "abcde", 1)
   setItem(&tr, "abcd", 2)
   tc.expect(t, 3 == getNumValues(&tr))
-  tc.expect(t, discard(&tr, "abcd"))
+  tc.expect(t, discardItem(&tr, "abcd"))
   tc.expect(t, 2 == getNumValues(&tr))
-  tc.expect(t, !discard(&tr, "abcd"))
+  tc.expect(t, !discardItem(&tr, "abcd"))
   arr := [?]int{97, 98, 99, 100, 101}
-  tc.expect(t, discard(&tr, arr[:]))
+  tc.expect(t, discardItem(&tr, arr[:]))
   tc.expect(t, 1 == getNumValues(&tr))
-  tc.expect(t, !discard(&tr, arr[:]))
+  tc.expect(t, !discardItem(&tr, arr[:]))
+}
+
+
+@(test)
+test_containsKey :: proc(t: ^testing.T) {
+  using trie
+  tr := makeTrie(int, int)
+  defer deleteTrie(&tr)
+  arr_abcdef := [?]int{97, 98, 99, 100, 101, 102}
+  tc.expect(t, !containsKey(&tr, "abcdef"))
+  tc.expect(t, !containsKey(&tr, arr_abcdef[:]))
+  setItem(&tr, "abcdef", 0)
+  tc.expect(t, containsKey(&tr, "abcdef"))
+  tc.expect(t, containsKey(&tr, arr_abcdef[:]))
+  tc.expect(t, !containsKey(&tr, "abcde"))
+  tc.expect(t, !containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 1]))
+  setItem(&tr, "abcde", 1)
+  tc.expect(t, containsKey(&tr, "abcde"))
+  tc.expect(t, containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 1]))
+  tc.expect(t, !containsKey(&tr, "abcd"))
+  tc.expect(t, !containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
+  setItem(&tr, "abcd", 2)
+  tc.expect(t, containsKey(&tr, "abcd"))
+  tc.expect(t, containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
+  tc.expect(t, discardItem(&tr, "abcd"))
+  tc.expect(t, 2 == getNumValues(&tr))
+  tc.expect(t, !containsKey(&tr, "abcd"))
+  tc.expect(t, !containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
 }
 
 @(test)
@@ -100,8 +129,21 @@ test_getLongestPrefix :: proc(t: ^testing.T) {
   setItem(&tr, "abcU", 2)
   {
     k, v := getLongestPrefix(&tr, "abcdeffff")
+    expected := "abcdef"
     tc.expect(t, v == 0)
-    tc.expect(t, k == "abcdef")
+    tc.expect(t, k == expected, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected, k))
+  }
+  {
+    arr := []int{97, 98, 99, 100, 101, 102, 102, 102, 102}
+    k, v := getLongestPrefix(&tr, arr[:])
+    expected_v := 0
+    expected_k := []int{97, 98, 99, 100, 101, 102}
+    tc.expect(t, v == expected_v, fmt.tprintf("Expected:%v  Got:%v", expected_v, v))
+    all_eq := len(k) == len(expected_k)
+    for idx in 0 ..< min(len(k), len(expected_k)) {
+      all_eq &= (expected_k[idx] == k[idx])
+    }
+    tc.expect(t, all_eq, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_k, k))
   }
   {
     k, v := getLongestPrefix(&tr, "abcde*******")

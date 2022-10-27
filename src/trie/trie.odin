@@ -32,23 +32,25 @@ deleteTrie :: proc(self: ^$T/Trie($K, $V)) {
   _deleteTrieNode(&self.root)
 }
 
+/////////////////////////////////////
+
 _getLongestPrefix :: proc(self: ^$T/Trie($K, $V), key: []K) -> ([]K, Maybe(V)) {
   // Finds the longest matching prefix in trie and returns the value there. 
   node := &self.root
   longest_value: Maybe(V) = nil
   longest_idx := 0
   for k, idx in key {
-    if value, ok := node.value.?; ok {
-      longest_idx = idx
-      longest_value = value
-    }
     if k in node.children {
       node = &node.children[k]
     } else {
       break
     }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+      longest_value = value
+    }
   }
-  return key[:longest_idx], longest_value
+  return key[:longest_idx + 1], longest_value
 }
 
 _getLongestPrefix_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> (string, Maybe(V)) where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
@@ -58,17 +60,17 @@ _getLongestPrefix_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> (st
   longest_idx := 0
   for k, idx in key {
     kint := K(k)
-    if value, ok := node.value.(V); ok {
-      longest_idx = idx
-      longest_value = value
-    }
     if kint in node.children {
       node = &node.children[kint]
     } else {
       break
     }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+      longest_value = value
+    }
   }
-  return key[:longest_idx], longest_value
+  return key[:longest_idx + 1], longest_value
 }
 
 getLongestPrefix :: proc {
@@ -76,21 +78,26 @@ getLongestPrefix :: proc {
   _getLongestPrefix_int_string,
 }
 
+///////////////////////////////////////////////////////////////////////////
+
 
 @(private)
 _discard :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
-  // Removes value specified by key, does nothing if not found. 
+  // Removes value specified by key and returns True, returns False if key is not found
   node := &self.root
-  key_idx := 0
+  longest_idx := 0
   for k, idx in key {
-    if k in node.children {
-      key_idx = idx + 1
-      node = &node.children[k]
+    kint := K(k)
+    if kint in node.children {
+      node = &node.children[kint]
     } else {
       break
     }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+    }
   }
-  if key_idx != len(key) {
+  if longest_idx + 1 != len(key) {
     return false
   }
   if value, ok := node.value.?; ok {
@@ -104,17 +111,19 @@ _discard :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
 @(private)
 _discard_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> bool where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
   node := &self.root
-  key_idx := 0
+  longest_idx := 0
   for k, idx in key {
     kint := K(k)
     if kint in node.children {
-      key_idx = idx + 1
       node = &node.children[kint]
     } else {
       break
     }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+    }
   }
-  if key_idx != len(key) {
+  if longest_idx + 1 != len(key) {
     return false
   }
   if value, ok := node.value.?; ok {
@@ -126,10 +135,56 @@ _discard_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> bool where i
 }
 
 
-discard :: proc {
+discardItem :: proc {// Removes value specified by key and returns True, returns False if key is not found
   _discard_int_string,
   _discard,
 }
+
+///////////////////////////////////////////////////////////////////////////
+
+_containsKey :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
+  node := &self.root
+  longest_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node = &node.children[kint]
+    } else {
+      break
+    }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+    }
+  }
+  out := longest_idx + 1 >= len(key)
+  return out
+}
+
+_containsKey_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> bool where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
+  node := &self.root
+  longest_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node = &node.children[kint]
+    } else {
+      break
+    }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+    }
+  }
+
+  out := longest_idx + 1 >= len(key)
+  return out
+}
+
+containsKey :: proc {
+  _containsKey,
+  _containsKey_int_string,
+}
+
+///////////////////////////////////////////////////////////////////////////
 
 _setItem :: proc(self: ^$T/Trie($K, $V), key: []K, value: V) {
   node := &self.root
@@ -164,6 +219,7 @@ setItem :: proc {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+
 @(private = "file")
 _StackItem :: struct($K, $V: typeid) {
   // assumes that the stack item will be allocated via temp_allocator,
@@ -176,7 +232,7 @@ _StackItem :: struct($K, $V: typeid) {
   mprefix:      Maybe(string),
 }
 
-getNumValues :: proc(self: ^$T/Trie($K, $V)) -> int {
+_getNumValues_fromNode :: proc(node: ^$T/_TrieNode($K, $V)) -> int {
   // Returns the number of nodes in the trie. 
   total := 0
   S :: _StackItem(K, V)
@@ -184,7 +240,7 @@ getNumValues :: proc(self: ^$T/Trie($K, $V)) -> int {
     data = make([dynamic]S, context.temp_allocator),
   }
   Q.init(&stack)
-  Q.push_back(&stack, S{node = &self.root})
+  Q.push_back(&stack, S{node = node})
   for stack.len > 0 {
     item := Q.pop_back(&stack)
     if value, ok := item.node.value.?; ok {
@@ -196,6 +252,12 @@ getNumValues :: proc(self: ^$T/Trie($K, $V)) -> int {
   }
   return total
 }
+
+getNumValues :: proc(self: ^$T/Trie($K, $V)) -> int {
+  return _getNumValues_fromNode(node = &self.root)
+}
+
+///////////////////////////////////////////////////////////////////////////
 
 @(require_results)
 pformatTrie :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> string {
@@ -248,7 +310,10 @@ pformatTrie :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> s
   return out
 }
 
-getAllValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []V {
+///////////////////////////////////////////////////////////////////////////
+
+@(require_results)
+_getAllValues_fromNode :: proc(node: ^$T/_TrieNode($K, $V), allocator := context.allocator) -> []V {
   // Returns all the values stored in the trie
   out := make([dynamic]V, allocator)
   S :: _StackItem(K, V)
@@ -256,7 +321,7 @@ getAllValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> 
     data = make([dynamic]S, context.temp_allocator),
   }
   Q.init(&stack)
-  Q.push_back(&stack, S{node = &self.root})
+  Q.push_back(&stack, S{node = node})
   for stack.len > 0 {
     item := Q.pop_back(&stack)
     if value, ok := item.node.value.?; ok {
@@ -269,7 +334,15 @@ getAllValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> 
   return out[:]
 }
 
-getAllKeys :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> [][]K {
+@(require_results)
+getAllValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []V {
+  return _getAllValues_fromNode(&self.root, allocator)
+}
+
+///////////////////////////////////////////////////////////////////////////
+
+@(require_results)
+_getAllKeys_fromNode :: proc(node: ^$T/_TrieNode($K, $V), allocator := context.allocator) -> [][]K {
   // returns all keys with values in the trie
   out := make([dynamic][]K, allocator)
   S :: _StackItem(K, V)
@@ -277,7 +350,7 @@ getAllKeys :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []
     data = make([dynamic]S, context.temp_allocator),
   }
   Q.init(&stack)
-  Q.push_back(&stack, S{node = &self.root})
+  Q.push_back(&stack, S{node = node})
   for stack.len > 0 {
     item := Q.pop_back(&stack)
     if value, ok := item.node.value.?; ok {
@@ -303,6 +376,13 @@ getAllKeys :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []
 }
 
 
+@(require_results)
+getAllKeys :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> [][]K {
+  return _getAllKeys_fromNode(&self.root, allocator)
+}
+
+///////////////////////////////////////////////////////////////////////////
+
 TrieKeyValue :: struct($K, $V: typeid) {
   key:   []K,
   value: V,
@@ -315,7 +395,8 @@ deleteTrieKeyValue :: proc(kv: ^$T/TrieKeyValue($K, $V)) {
   delete(kv.key)
 }
 
-getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []TrieKeyValue(K, V) {
+@(require_results)
+_getAllKeyValues_fromNode :: proc(node: ^$T/_TrieNode($K, $V), allocator := context.allocator) -> []TrieKeyValue(K, V) {
   // returns all keys with values in the trie
   out := make([dynamic]TrieKeyValue(K, V), allocator)
   S :: _StackItem(K, V)
@@ -323,7 +404,7 @@ getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) 
     data = make([dynamic]S, context.temp_allocator),
   }
   Q.init(&stack)
-  Q.push_back(&stack, S{node = &self.root})
+  Q.push_back(&stack, S{node = node})
   for stack.len > 0 {
     item := Q.pop_back(&stack)
     if value, ok := item.node.value.?; ok {
@@ -347,5 +428,12 @@ getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) 
   }
   return out[:]
 }
+
+@(require_results)
+getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> []TrieKeyValue(K, V) {
+  return _getAllKeyValues_fromNode(&self.root, allocator)
+}
+
+///////////////////////////////////////////////////////////////////////////
 
 // TODO - get all values after prefix
