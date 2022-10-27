@@ -19,5 +19,6 @@ main :: proc() {
   context.logger = multi_logger
 
   test_ArgumentOption(&t)
+  test_ArgumentParser(&t)
   tc.report(&t)
 }
