@@ -436,4 +436,87 @@ getAllKeyValues :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) 
 
 ///////////////////////////////////////////////////////////////////////////
 
-// TODO - get all values after prefix
+_getPrefixNode_fromNode_v :: proc(node: ^$T/_TrieNode($K, $V), key: []K) -> ^_TrieNode(K, V) {
+  if node == nil {
+    return nil
+  }
+  node := node
+  node_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node_idx = idx
+      node = &node.children[kint]
+    } else {
+      break
+    }
+  }
+  if node_idx + 1 >= len(key) {
+    // found node - regardless of it containing a value
+    return node
+  } else {
+    return nil
+  }
+}
+
+_getPrefixNode_fromNode_int_string :: proc(node: ^$T/_TrieNode($K, $V), key: string) -> ^_TrieNode(K, V) where intrinsics.type_is_integer(K) &&
+  size_of(K) >= 4 {
+  if node == nil {
+    return nil
+  }
+  node := node
+  node_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node_idx = idx
+      node = &node.children[kint]
+    } else {
+      break
+    }
+  }
+  if node_idx + 1 >= len(key) {
+    // found node - regardless of it containing a value
+    return node
+  } else {
+    return nil
+  }
+}
+
+_getPrefixNode_fromNode :: proc {
+  _getPrefixNode_fromNode_v,
+  _getPrefixNode_fromNode_int_string,
+}
+
+_getPrefixNode :: proc(self: ^$T/Trie($K, $V), key: $KEY) -> ^_TrieNode(K, V) {
+  return _getPrefixNode_fromNode(&self.root, key)
+}
+
+
+@(require_results)
+getAllValuesWithPrefix :: proc(self: ^$T/Trie($K, $V), key: $KEY, allocator := context.allocator) -> []V {
+  node := _getPrefixNode(self, key)
+  if node == nil {
+    return {}
+  }
+  return _getAllValues_fromNode(node, allocator)
+}
+
+@(require_results)
+getAllKeysWithPrefix :: proc(self: ^$T/Trie($K, $V), key: $KEY, allocator := context.allocator) -> [][]K {
+  node := _getPrefixNode(self, key)
+  if node == nil {
+    return {}
+  }
+  return _getAllKeys_fromNode(node, allocator)
+}
+
+
+@(require_results)
+getAllKeyValuesWithPrefix :: proc(self: ^$T/Trie($K, $V), key: $KEY, allocator := context.allocator) -> []TrieKeyValue(K, V) {
+  node := _getPrefixNode(self, key)
+  if node == nil {
+    return {}
+  }
+  return _getAllKeyValues_fromNode(node, allocator)
+}

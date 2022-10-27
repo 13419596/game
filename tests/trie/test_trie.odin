@@ -7,6 +7,7 @@ import "core:log"
 import "core:runtime"
 import "core:testing"
 import "game:trie"
+import set "game:container/set"
 import tc "tests:common"
 
 @(test)
@@ -17,6 +18,7 @@ test_Trie :: proc(t: ^testing.T) {
   test_containsKey(t)
   test_getLongestPrefix(t)
   test_getAllValues(t)
+  test_getAllWithPrefix(t)
 }
 
 @(test)
@@ -194,5 +196,98 @@ test_getAllValues :: proc(t: ^testing.T) {
     }
     log.debugf("KEY-VALUES:\n%v", kvs)
     tc.expect(t, len(kvs) == 5)
+  }
+}
+
+@(test)
+test_getAllWithPrefix :: proc(t: ^testing.T) {
+  using trie
+  tr := makeTrie(int, int)
+  defer deleteTrie(&tr)
+  setItem(&tr, "--test", 0)
+  setItem(&tr, "--test1", 1)
+  setItem(&tr, "--test2", 2)
+  setItem(&tr, "--option", 3)
+  {
+    prefix := "--test"
+    {
+      expected_values := set.fromArray([]int{0, 1, 2})
+      defer set.deleteSet(&expected_values)
+      expected_keys := set.fromArray([]string{"--test", "--test1", "--test2"})
+      defer set.deleteSet(&expected_keys)
+      values := set.fromArray(getAllValuesWithPrefix(&tr, prefix, context.temp_allocator))
+      defer set.deleteSet(&values)
+      keys := getAllKeysWithPrefix(&tr, prefix)
+      defer {
+        for k in keys {
+          delete(k)
+        }
+        delete(keys)
+      }
+      kvs := getAllKeyValuesWithPrefix(&tr, prefix)
+      defer {
+        for kv in &kvs {
+          deleteTrieKeyValue(&kv)
+        }
+        delete(kvs)
+      }
+      tc.expect(t, set.isequal(&expected_values, &values), fmt.tprintf("Expected:%v. Got:%v", expected_values, values))
+      tc.expect(t, len(keys) == set.size(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", set.size(&expected_keys), len(keys)))
+      tc.expect(t, len(kvs) == set.size(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", set.size(&expected_keys), len(kvs)))
+    }
+  }
+  {
+    prefix := []int{45, 45, 116, 101, 115, 116}
+    {
+      expected_values := set.fromArray([]int{0, 1, 2})
+      defer set.deleteSet(&expected_values)
+      expected_keys := [][]int{{45, 45, 116, 101, 115, 116}, {45, 45, 116, 101, 115, 116, 49}, {45, 45, 116, 101, 115, 116, 50}}
+      values := set.fromArray(getAllValuesWithPrefix(&tr, prefix, context.temp_allocator))
+      defer set.deleteSet(&values)
+      keys := getAllKeysWithPrefix(&tr, prefix)
+      defer {
+        for k in keys {
+          delete(k)
+        }
+        delete(keys)
+      }
+      kvs := getAllKeyValuesWithPrefix(&tr, prefix)
+      defer {
+        for kv in &kvs {
+          deleteTrieKeyValue(&kv)
+        }
+        delete(kvs)
+      }
+      tc.expect(t, set.isequal(&expected_values, &values), fmt.tprintf("Expected:%v. Got:%v", expected_values, values))
+      tc.expect(t, len(keys) == len(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(&expected_keys), len(keys)))
+      tc.expect(t, len(kvs) == len(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(&expected_keys), len(kvs)))
+    }
+  }
+  {
+    prefix := "UUUUUUU"
+    {
+      expected_values := []int{}
+      expected_keys := []string{}
+      expected_kvs := []TrieKeyValue(int, int){}
+      values := getAllValuesWithPrefix(&tr, prefix)
+      defer delete(values)
+      keys := getAllKeysWithPrefix(&tr, prefix)
+      defer {
+        for k in keys {
+          delete(k)
+        }
+        delete(keys)
+      }
+      kvs := getAllKeyValuesWithPrefix(&tr, prefix)
+      defer {
+        for kv in &kvs {
+          deleteTrieKeyValue(&kv)
+        }
+        delete(kvs)
+      }
+      tc.expect(t, len(values) == len(expected_values), fmt.tprintf("Expected:%v. Got:%v", len(expected_values), len(values)))
+      tc.expect(t, len(keys) == len(expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(expected_keys), len(keys)))
+      tc.expect(t, len(kvs) == len(expected_kvs), fmt.tprintf("Expected:%v. Got:%v", len(expected_kvs), len(kvs)))
+    }
   }
 }
