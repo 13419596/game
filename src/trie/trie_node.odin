@@ -20,13 +20,13 @@ _makeTrieNode :: proc(key: $K, $V: typeid, allocator := context.allocator) -> _T
   return out
 }
 
-_deleteTrieNode :: proc(self: ^$T/_TrieNode($K, $V)) {
+_deleteTrieNode :: proc(self: ^$T/_TrieNode($K, $V), allocator := context.allocator) {
   if self == nil {
     return
   }
   self.value = {}
   for k, v in &self.children {
-    _deleteTrieNode(&v)
+    _deleteTrieNode(&v, allocator)
   }
   delete(self.children)
   self.children = {}

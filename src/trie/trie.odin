@@ -12,15 +12,15 @@ Trie :: struct($K, $V: typeid) {
   // This class is a data structure where data is entered into a prefix tree using iterable keys (e.g. strings)
   // and stores data at that node. Then when querying data, the longest matching prefix is found and the data there
   // is returned.
-  root:      _TrieNode(K, V),
-  allocator: runtime.Allocator,
+  root:       _TrieNode(K, V),
+  _allocator: runtime.Allocator,
 }
 
 @(require_results)
 makeTrie :: proc($K, $V: typeid, allocator := context.allocator) -> Trie(K, V) {
   out := Trie(K, V) {
-    root      = _makeTrieNode(K{}, V, allocator),
-    allocator = allocator,
+    root       = _makeTrieNode(K{}, V, allocator),
+    _allocator = allocator,
   }
   return out
 }
@@ -29,7 +29,7 @@ deleteTrie :: proc(self: ^$T/Trie($K, $V)) {
   if self == nil {
     return
   }
-  _deleteTrieNode(&self.root)
+  _deleteTrieNode(&self.root, self._allocator)
 }
 
 /////////////////////////////////////
@@ -192,7 +192,7 @@ _setItem :: proc(self: ^$T/Trie($K, $V), key: []K, value: V) {
     if k in node.children {
       node = &node.children[k]
     } else {
-      node.children[k] = _makeTrieNode(k, V, self.allocator)
+      node.children[k] = _makeTrieNode(k, V, self._allocator)
       node = &node.children[k]
     }
   }
@@ -206,7 +206,7 @@ _setItem_int_string :: proc(self: ^$T/Trie($K, $V), key: string, value: V) where
     if kint in node.children {
       node = &node.children[kint]
     } else {
-      node.children[kint] = _makeTrieNode(kint, V, self.allocator)
+      node.children[kint] = _makeTrieNode(kint, V, self._allocator)
       node = &node.children[kint]
     }
   }
