@@ -11,6 +11,7 @@ ValueType :: distinct [0]int
 Set :: struct($T: typeid) {
   // no built-in set type, so use a map instead
   set: map[T]ValueType,
+  // no need to remember allocator, set map object remembers allocator used
 }
 
 @(require_results)
