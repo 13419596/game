@@ -17,8 +17,8 @@ NumTokens :: struct {
 
 NargsType :: union {
   int,
-  rune,
   string,
+  // rune,
 }
 
 ArgumentFlagType :: enum {
@@ -38,6 +38,7 @@ ArgumentOption :: struct {
   action:         ArgumentAction,
   required:       bool,
   help:           string,
+  num_tokens:     NumTokens,
   /*
   // In header: <boost/program_flags/value_semantic.hpp>
 
@@ -64,14 +65,13 @@ public:
   _is_composed:   bool, // multipart
   _cache_usage:   Maybe(string),
   _cache_help:    Maybe(string),
-  nargs:          int,
 }
 
 @(require_results)
 makeArgumentOption :: proc(
   flags: []string,
   dest: Maybe(string) = nil,
-  nargs: Maybe(int) = nil,
+  nargs := NargsType{},
   action := ArgumentAction.Store,
   required: bool = false,
   help: Maybe(string) = nil,
@@ -81,59 +81,38 @@ makeArgumentOption :: proc(
   out: ArgumentOption,
   ok: bool,
 ) {
-  ok = _areFlagsOkay(flags, prefix)
-  if !ok {
+  if !_areFlagsOkay(flags, prefix) {
+    ok = false
     return
   }
   ok = false
   out = ArgumentOption {
-    action     = action,
-    required   = required,
-    _allocator = allocator,
+    action       = action,
+    required     = required,
+    flags        = _cleanFlags(flags, prefix, allocator),
+    _allocator   = allocator,
+    _is_composed = isArgumentActionComposed(action),
   }
-  if opt_nargs, nargs_ok := nargs.?; nargs_ok {
-    out.nargs = opt_nargs
+  out._is_positional = _isPositionalFlag(out.flags[0])
+  if num_tokens, num_tokens_ok := _parseNargs(out.action, nargs); num_tokens_ok {
+    out.num_tokens = num_tokens
   } else {
-    // unspecified so set to default
-    switch out.action {
-    case .StoreTrue:
-      fallthrough
-    case .StoreFalse:
-      fallthrough
-    case .StoreConst:
-      fallthrough
-    case .AppendConst:
-      fallthrough
-    case .Count:
-      fallthrough
-    case .Help:
-      fallthrough
-    case .Version:
-      out.nargs = 0
-    case .Append:
-      fallthrough
-    case .Extend:
-      fallthrough
-    case .Store:
-      out.nargs = 1
-    }
-  }
-  if out.nargs < 0 {
-    log.errorf("Nargs is invalid. Got:%v", out.nargs)
+    ok = false
+    deleteArgumentOption(&out)
     return
   }
-  {
-    tmp_flags := make([dynamic]string, 0, len(flags), allocator)
-    for _, idx in flags {
-      append(&tmp_flags, _replaceRunes(flags[idx], {prefix}, prefix, allocator))
-    }
-    out.flags = tmp_flags[:]
+  if !_isOptionNumTokensValid(out._is_positional, out.action, out.num_tokens) {
+    ok = false
+    deleteArgumentOption(&out)
+    return
   }
   if dest_string, mdest_ok := dest.?; mdest_ok {
     out.dest = dest_string
   } else {
-    out.dest, ok = _getDestFromFlags(out.flags, prefix)
-    if !ok {
+    if dest, dest_ok := _getDestFromFlags(out.flags, prefix); dest_ok {
+      out.dest = dest
+    } else {
+      ok = false
       deleteArgumentOption(&out)
       return
     }
@@ -141,49 +120,9 @@ makeArgumentOption :: proc(
   if shelp, ok := help.?; ok {
     out.help = strings.clone(shelp, allocator)
   }
-  out._is_composed = isArgumentActionComposed(out.action)
-  out._is_positional = _isPositionalFlag(out.flags[0])
-  if out._is_positional {
-    if out.nargs <= 0 {
-      log.errorf("Argument is positional, but nargs is invalid. Expected >0. Got:%v", out.nargs)
-      deleteArgumentOption(&out)
-      return
-    }
-    if !out.required {
-      log.warnf("`required` is an invalid argument for positional argument. Defaulting to true")
-      out.required = true
-    }
-  } else {
-    switch out.action {
-    case .StoreTrue:
-      fallthrough
-    case .StoreFalse:
-      fallthrough
-    case .StoreConst:
-      fallthrough
-    case .AppendConst:
-      fallthrough
-    case .Count:
-      fallthrough
-    case .Help:
-      fallthrough
-    case .Version:
-      if out.nargs != 0 {
-        log.errorf("Argument action is %v, so expected narg==0. Got:%v", out.action, out.nargs)
-        deleteArgumentOption(&out)
-        return
-      }
-    case .Append:
-      fallthrough
-    case .Extend:
-      fallthrough
-    case .Store:
-      if out.nargs == 0 {
-        deleteArgumentOption(&out)
-        log.errorf("Argument action is %v, so expected narg>0. Got:%v", out.action, out.nargs)
-        return
-      }
-    }
+  if out._is_positional && !out.required {
+    log.warnf("`required` is an invalid argument for positional argument. Defaulting to true")
+    out.required = true
   }
   ok = true
   return
@@ -272,7 +211,7 @@ _areFlagsOkay :: proc(flags: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
         has_positional = true
         break
       } else {
-        log.errorf("Only a single positional flag is allowed. flags[%v]:\"%\"", idx, flag)
+        log.errorf("Only a single positional flag is allowed. flags[%v]:\"%v\"", idx, flag)
         ok = false
       }
       fallthrough
@@ -375,9 +314,16 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
   flag0 := len(self.flags) > 0 ? self.flags[0] : ""
   out: string = ""
   if self._is_positional {
-    pieces := make([dynamic]string, self.nargs)
-    for idx in 0 ..< self.nargs {
-      pieces[idx] = flag0
+    pieces := make([dynamic]string)
+    for idx in 0 ..< self.num_tokens.lower {
+      append(&pieces, flag0)
+    }
+    if upper, upper_ok := self.num_tokens.upper.?; upper_ok {
+      // TODO ---- 
+    } else {
+      // no bound
+      append(&pieces, concatenate({"[", flag0}))
+      append(&pieces, "...]")
     }
     out = join(pieces[:], " ", self._allocator)
   } else {
@@ -386,9 +332,9 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
       append(&line, "[")
     }
     append(&line, flag0)
-    if self.nargs > 0 {
-      opt_u := fmt.tprintf(" %v", strings.to_upper(self.dest))
-      append(&line, strings.repeat(opt_u, self.nargs))
+    if self.num_tokens.lower > 0 {
+      log.warnf("num tokens:%v ;; ", self.num_tokens)
+      append(&line, strings.repeat(concatenate({" ", to_upper(self.dest)}), self.num_tokens.lower))
     }
     if !self.required {
       append(&line, "]")
@@ -406,9 +352,10 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width
   using strings
   context.allocator = context.temp_allocator
   vars := ""
-  if self.nargs > 0 && !self._is_positional {
-    dest_u := fmt.tprintf(" %v", to_upper(self.dest))
-    vars = repeat(dest_u, self.nargs)
+  if !self._is_positional {
+    if self.num_tokens.lower > 0 {
+      vars = repeat(concatenate({" ", to_upper(self.dest)}), self.num_tokens.lower)
+    }
   }
   opt_vars := make([dynamic]string)
   for flag, idx in self.flags {
@@ -441,10 +388,10 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width
 
 /////////////////////////////////////////////////////////
 
-_parseNargs :: proc(action: ArgumentAction, mnargs: Maybe(NargsType)) -> (out: NumTokens, ok: bool) {
+_parseNargs :: proc(action: ArgumentAction, vnargs: NargsType) -> (out: NumTokens, ok: bool) {
   out = NumTokens{}
   ok = true
-  if vnargs, vnarg_ok := mnargs.?; vnarg_ok {
+  if vnargs != nil {
     switch nargs in vnargs {
     case int:
       if nargs < 0 {
@@ -454,6 +401,21 @@ _parseNargs :: proc(action: ArgumentAction, mnargs: Maybe(NargsType)) -> (out: N
         out.lower = nargs
         out.upper = nargs
       }
+    // case rune:
+    //   switch nargs {
+    //   case '?':
+    //     out.lower = 0
+    //     out.upper = 1
+    //   case '*':
+    //     out.lower = 0
+    //     out.upper = {}
+    //   case '+':
+    //     out.lower = 1
+    //     out.upper = {}
+    //   case:
+    //     log.errorf("If nargs is a string, it must be in the set {'?', '*', '+'}. Got:'%v'", nargs)
+    //     ok = false
+    //   }
     case string:
       switch nargs {
       case "?":
@@ -466,28 +428,52 @@ _parseNargs :: proc(action: ArgumentAction, mnargs: Maybe(NargsType)) -> (out: N
         out.lower = 1
         out.upper = {}
       case:
-        log.errorf("If nargs is a string, it must be in the set {\"?\",\"*\",\"+\"}. Got:\"%v\"", nargs)
-        ok = false
-      }
-    case rune:
-      switch nargs {
-      case '?':
-        out.lower = 0
-        out.upper = 1
-      case '*':
-        out.lower = 0
-        out.upper = {}
-      case '+':
-        out.lower = 1
-        out.upper = {}
-      case:
-        log.errorf("If nargs is a rune, it must be in the set {'?','*','+'}. Got:'%v'", nargs)
+        log.errorf("If nargs is a string, it must be in the set {{\"?\", \"*\", \"+\"}}. Got:\"%v\"", nargs)
         ok = false
       }
     }
-    return
+  } else {
+    // use default 
+    switch action {
+    case .StoreTrue:
+      fallthrough
+    case .StoreFalse:
+      fallthrough
+    case .StoreConst:
+      fallthrough
+    case .AppendConst:
+      fallthrough
+    case .Count:
+      fallthrough
+    case .Help:
+      fallthrough
+    case .Version:
+      out.lower = 0
+      out.upper = 0
+    ///////////////
+    case .Append:
+      out.lower = 0
+      out.upper = 1
+    case .Extend:
+      out.lower = 0
+      out.upper = {}
+    case .Store:
+      out.lower = 1
+      out.upper = 1
+    }
   }
-  // use default 
+  return
+}
+
+_cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> []string {
+  flags := make([dynamic]string, len(raw_flags), allocator)
+  for raw_flag, idx in raw_flags {
+    flags[idx] = _replaceRunes(raw_flag, {prefix}, prefix, allocator)
+  }
+  return flags[:]
+}
+
+_isPositionalOptionNumTokensValid :: proc(action: ArgumentAction, num_tokens: NumTokens) -> bool {
   switch action {
   case .StoreTrue:
     fallthrough
@@ -502,18 +488,60 @@ _parseNargs :: proc(action: ArgumentAction, mnargs: Maybe(NargsType)) -> (out: N
   case .Help:
     fallthrough
   case .Version:
-    out.lower = 0
-    out.upper = 0
-  ///////////////
+    fallthrough
   case .Append:
-    out.lower = 0
-    out.upper = 1
+    fallthrough
   case .Extend:
-    out.lower = 0
-    out.upper = {}
+    log.errorf("Argument is positional, but action is %v. This is invalid.", action)
+    return false
   case .Store:
-    out.lower = 1
-    out.upper = 1
+  // okay
   }
-  return
+  if num_tokens.lower <= 0 {
+    log.errorf("Argument is positional, but nargs is invalid. Expected >0. Got:%v", num_tokens)
+    return false
+  }
+  return true
+}
+
+_isKeywordOptionNumTokensValid :: proc(action: ArgumentAction, num_tokens: NumTokens) -> bool {
+  switch action {
+  case .StoreTrue:
+    fallthrough
+  case .StoreFalse:
+    fallthrough
+  case .StoreConst:
+    fallthrough
+  case .AppendConst:
+    fallthrough
+  case .Count:
+    fallthrough
+  case .Help:
+    fallthrough
+  case .Version:
+    if num_tokens.lower != 0 || num_tokens.upper != 0 {
+      log.errorf("Argument action is %v, so expected num args==0. Got:%v", action, num_tokens)
+      return false
+    }
+  //////////////////
+  case .Append:
+    fallthrough
+  case .Extend:
+    fallthrough
+  case .Store:
+    if upper, upper_ok := num_tokens.upper.?; upper_ok {
+      if upper < num_tokens.lower {
+        log.errorf("Argument action is %v, so expected upper > lower. Got upper:%v lower:%v", action, upper, num_tokens.lower)
+        return false
+      }
+    }
+  }
+  return true
+}
+
+_isOptionNumTokensValid :: proc(is_positional: bool, action: ArgumentAction, num_tokens: NumTokens) -> bool {
+  if is_positional {
+    return _isPositionalOptionNumTokensValid(action, num_tokens)
+  }
+  return _isKeywordOptionNumTokensValid(action, num_tokens)
 }

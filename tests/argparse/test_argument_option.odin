@@ -146,16 +146,15 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
       tc.expect(t, !ok)
     }
     {
-      ao, ok := makeArgumentOption(
-        flags = []string{"abc"},
-        action = ArgumentAction.StoreTrue,
-        required = true,
-        help = "Make program more verbose",
-        allocator = alloc,
-      )
-      tc.expect(t, ok)
+      for action in ArgumentAction {
+        expected_ok := action == ArgumentAction.Store
+        ao, ok := makeArgumentOption(flags = []string{"abc"}, action = action, required = true, help = "Make program more verbose", allocator = alloc)
+        tc.expect(t, ok == expected_ok)
+        defer deleteArgumentOption(&ao)
+      }
     }
     {
+      // cannot have multiple positionals
       ao, ok := makeArgumentOption(
         flags = []string{"abc", "def"},
         action = ArgumentAction.StoreTrue,
@@ -166,6 +165,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
       tc.expect(t, !ok)
     }
     {
+      // cannot mix positional and keyword
       ao, ok := makeArgumentOption(
         flags = []string{"abc", "--def"},
         action = ArgumentAction.StoreTrue,
@@ -176,6 +176,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
       tc.expect(t, !ok)
     }
     {
+      // cannot mix positional and keyword
       ao, ok := makeArgumentOption(
         flags = []string{"abc", "-d"},
         action = ArgumentAction.StoreTrue,
@@ -260,6 +261,14 @@ test_getUsageString :: proc(t: ^testing.T) {
       expected_usage := "pos pos pos"
       tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_usage, usage))
     }
+    {
+      ao, ok := makeArgumentOption(flags = []string{"pos+"}, action = ArgumentAction.Store, help = "Make program more verbose", allocator = alloc, nargs = "+")
+      defer deleteArgumentOption(&ao)
+      tc.expect(t, ok)
+      usage := _getUsageString(&ao)
+      expected_usage := "pos+ [pos+ ...]"
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage, usage))
+    }
   }
 }
 
@@ -274,7 +283,11 @@ test_getHelpCache :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
       expected_cache_help := "  -l L                  0123456789\n                        0123456789"
-      tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
+      tc.expect(
+        t,
+        expected_cache_help == help_cache,
+        fmt.tprintf("Num tokens:%v\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", ao.num_tokens, expected_cache_help, help_cache),
+      )
     }
     {
       ao, ok := makeArgumentOption(
@@ -324,14 +337,6 @@ test_parseNargs :: proc(t: ^testing.T) {
   using argparse
   {
     values := []string{"?", "*", "+", "asdf", "?d"}
-    oks := []bool{true, true, true, false, false}
-    for value, idx in values {
-      lbub, ok := _parseNargs({}, value)
-      tc.expect(t, ok == oks[idx])
-    }
-  }
-  {
-    values := []rune{'?', '*', '+', 'a', 'b'}
     oks := []bool{true, true, true, false, false}
     for value, idx in values {
       lbub, ok := _parseNargs({}, value)

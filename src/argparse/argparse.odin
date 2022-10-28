@@ -29,7 +29,7 @@ ArgumentParser :: struct {
 
 @(require_results)
 makeArgumentParser :: proc(
-  prog: Maybe(string) = nil,
+  prog := Maybe(string){},
   description: string = "",
   epilog: string = "",
   prefix_rune: rune = _DEFAULT_PREFIX_RUNE,
@@ -105,7 +105,7 @@ addArgument :: proc(
   self: $T/^ArgumentParser,
   flags: []string,
   action := ArgumentAction.Store,
-  nargs := Maybe(int){},
+  nargs := NargsType{},
   required := false,
   dest := Maybe(string){},
   help := Maybe(string){},

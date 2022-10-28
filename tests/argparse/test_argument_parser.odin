@@ -46,7 +46,6 @@ test_addArgument :: proc(t: ^testing.T) {
       {
         ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
         tc.expect(t, ok)
-        log.warnf("AP: %v; \nopts:%v", ap, ap.options)
       }
       {
         /// should conflict with previous
