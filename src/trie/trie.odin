@@ -142,7 +142,7 @@ discardItem :: proc {// Removes value specified by key and returns True, returns
 
 ///////////////////////////////////////////////////////////////////////////
 
-_containsKey :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
+_hasKey :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
   node := &self.root
   longest_idx := 0
   for k, idx in key {
@@ -160,7 +160,7 @@ _containsKey :: proc(self: ^$T/Trie($K, $V), key: []K) -> bool {
   return out
 }
 
-_containsKey_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> bool where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
+_hasKey_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> bool where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
   node := &self.root
   longest_idx := 0
   for k, idx in key {
@@ -179,14 +179,14 @@ _containsKey_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> bool whe
   return out
 }
 
-containsKey :: proc {
-  _containsKey,
-  _containsKey_int_string,
+hasKey :: proc {
+  _hasKey,
+  _hasKey_int_string,
 }
 
 ///////////////////////////////////////////////////////////////////////////
 
-_setItem :: proc(self: ^$T/Trie($K, $V), key: []K, value: V) {
+_setValue :: proc(self: ^$T/Trie($K, $V), key: []K, value: V) {
   node := &self.root
   for k, idx in key {
     if k in node.children {
@@ -199,7 +199,7 @@ _setItem :: proc(self: ^$T/Trie($K, $V), key: []K, value: V) {
   node.value = value
 }
 
-_setItem_int_string :: proc(self: ^$T/Trie($K, $V), key: string, value: V) where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
+_setValue_int_string :: proc(self: ^$T/Trie($K, $V), key: string, value: V) where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
   node := &self.root
   for k, idx in key {
     kint := K(k)
@@ -213,9 +213,58 @@ _setItem_int_string :: proc(self: ^$T/Trie($K, $V), key: string, value: V) where
   node.value = value
 }
 
-setItem :: proc {
-  _setItem_int_string,
-  _setItem,
+setValue :: proc {
+  _setValue_int_string,
+  _setValue,
+}
+
+///////////////////////////////////////////////////////////////////////////
+
+_getValue :: proc(self: ^$T/Trie($K, $V), key: []K) -> (out: V, ok: bool) {
+  node := &self.root
+  longest_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node = &node.children[kint]
+    } else {
+      break
+    }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+    }
+  }
+  if longest_idx + 1 >= len(key) {
+    out = node.value.?
+    ok = true
+  }
+  return
+}
+
+_getValue_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> (out: V, ok: bool) where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
+  node := &self.root
+  longest_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node = &node.children[kint]
+    } else {
+      break
+    }
+    if value, ok := node.value.?; ok {
+      longest_idx = idx
+    }
+  }
+  if longest_idx + 1 >= len(key) {
+    out = node.value.?
+    ok = true
+  }
+  return
+}
+
+getValue :: proc {
+  _getValue,
+  _getValue_int_string,
 }
 
 ///////////////////////////////////////////////////////////////////////////

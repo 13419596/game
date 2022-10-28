@@ -13,9 +13,9 @@ import tc "tests:common"
 @(test)
 test_Trie :: proc(t: ^testing.T) {
   test_makeTrie(t)
-  test_setItem(t)
+  test_setValue(t)
   test_discardItem(t)
-  test_containsKey(t)
+  test_hasKey(t)
   test_getLongestPrefix(t)
   test_getAllValues(t)
   test_getAllWithPrefix(t)
@@ -37,14 +37,14 @@ test_makeTrie :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_setItem :: proc(t: ^testing.T) {
+test_setValue :: proc(t: ^testing.T) {
   using trie
   {
     tr := makeTrie(int, int)
     defer deleteTrie(&tr)
     tc.expect(t, 0 == getNumValues(&tr))
-    setItem(&tr, "AB", 3)
-    setItem(&tr, "AC", 4)
+    setValue(&tr, "AB", 3)
+    setValue(&tr, "AC", 4)
     tc.expect(t, len(tr.root.children) == 1)
     tc.expect(t, 2 == getNumValues(&tr))
   }
@@ -52,8 +52,8 @@ test_setItem :: proc(t: ^testing.T) {
     tr := makeTrie(uint, int)
     defer deleteTrie(&tr)
     tc.expect(t, 0 == getNumValues(&tr))
-    setItem(&tr, "AB", 3)
-    setItem(&tr, "AC", 4)
+    setValue(&tr, "AB", 3)
+    setValue(&tr, "AC", 4)
     tc.expect(t, len(tr.root.children) == 1)
     tc.expect(t, 2 == getNumValues(&tr))
   }
@@ -62,12 +62,12 @@ test_setItem :: proc(t: ^testing.T) {
     defer deleteTrie(&tr)
     tc.expect(t, 0 == getNumValues(&tr))
     arr := [?]int{3, 8}
-    setItem(&tr, arr[:], 3)
+    setValue(&tr, arr[:], 3)
     arr[len(arr) - 1] = 6555
-    setItem(&tr, arr[:], 4)
+    setValue(&tr, arr[:], 4)
     tc.expect(t, len(tr.root.children) == 1)
     tc.expect(t, 2 == getNumValues(&tr))
-    setItem(&tr, arr[:], 400000)
+    setValue(&tr, arr[:], 400000)
     tc.expect(t, len(tr.root.children) == 1)
   }
 }
@@ -78,9 +78,9 @@ test_discardItem :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
-  setItem(&tr, "abcdef", 0)
-  setItem(&tr, "abcde", 1)
-  setItem(&tr, "abcd", 2)
+  setValue(&tr, "abcdef", 0)
+  setValue(&tr, "abcde", 1)
+  setValue(&tr, "abcd", 2)
   tc.expect(t, 3 == getNumValues(&tr))
   tc.expect(t, discardItem(&tr, "abcd"))
   tc.expect(t, 2 == getNumValues(&tr))
@@ -93,30 +93,30 @@ test_discardItem :: proc(t: ^testing.T) {
 
 
 @(test)
-test_containsKey :: proc(t: ^testing.T) {
+test_hasKey :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
   arr_abcdef := [?]int{97, 98, 99, 100, 101, 102}
-  tc.expect(t, !containsKey(&tr, "abcdef"))
-  tc.expect(t, !containsKey(&tr, arr_abcdef[:]))
-  setItem(&tr, "abcdef", 0)
-  tc.expect(t, containsKey(&tr, "abcdef"))
-  tc.expect(t, containsKey(&tr, arr_abcdef[:]))
-  tc.expect(t, !containsKey(&tr, "abcde"))
-  tc.expect(t, !containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 1]))
-  setItem(&tr, "abcde", 1)
-  tc.expect(t, containsKey(&tr, "abcde"))
-  tc.expect(t, containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 1]))
-  tc.expect(t, !containsKey(&tr, "abcd"))
-  tc.expect(t, !containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
-  setItem(&tr, "abcd", 2)
-  tc.expect(t, containsKey(&tr, "abcd"))
-  tc.expect(t, containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
+  tc.expect(t, !hasKey(&tr, "abcdef"))
+  tc.expect(t, !hasKey(&tr, arr_abcdef[:]))
+  setValue(&tr, "abcdef", 0)
+  tc.expect(t, hasKey(&tr, "abcdef"))
+  tc.expect(t, hasKey(&tr, arr_abcdef[:]))
+  tc.expect(t, !hasKey(&tr, "abcde"))
+  tc.expect(t, !hasKey(&tr, arr_abcdef[:len(arr_abcdef) - 1]))
+  setValue(&tr, "abcde", 1)
+  tc.expect(t, hasKey(&tr, "abcde"))
+  tc.expect(t, hasKey(&tr, arr_abcdef[:len(arr_abcdef) - 1]))
+  tc.expect(t, !hasKey(&tr, "abcd"))
+  tc.expect(t, !hasKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
+  setValue(&tr, "abcd", 2)
+  tc.expect(t, hasKey(&tr, "abcd"))
+  tc.expect(t, hasKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
   tc.expect(t, discardItem(&tr, "abcd"))
   tc.expect(t, 2 == getNumValues(&tr))
-  tc.expect(t, !containsKey(&tr, "abcd"))
-  tc.expect(t, !containsKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
+  tc.expect(t, !hasKey(&tr, "abcd"))
+  tc.expect(t, !hasKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
 }
 
 @(test)
@@ -124,11 +124,11 @@ test_getLongestPrefix :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
-  setItem(&tr, "abcdef", 0)
-  setItem(&tr, "abcdefffffffffffffff", 10)
-  setItem(&tr, "abcde", 1)
-  setItem(&tr, "abcd", 2)
-  setItem(&tr, "abcU", 2)
+  setValue(&tr, "abcdef", 0)
+  setValue(&tr, "abcdefffffffffffffff", 10)
+  setValue(&tr, "abcde", 1)
+  setValue(&tr, "abcd", 2)
+  setValue(&tr, "abcU", 2)
   {
     k, v := getLongestPrefix(&tr, "abcdeffff")
     expected := "abcdef"
@@ -159,11 +159,11 @@ test_getAllValues :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
-  setItem(&tr, "abcdef", 0)
-  setItem(&tr, "abcde", 1)
-  setItem(&tr, "abcd", 2)
-  setItem(&tr, "AbcU", 3)
-  setItem(&tr, "AbcUUUUU", 4)
+  setValue(&tr, "abcdef", 0)
+  setValue(&tr, "abcde", 1)
+  setValue(&tr, "abcd", 2)
+  setValue(&tr, "AbcU", 3)
+  setValue(&tr, "AbcUUUUU", 4)
   {
     s := pformatTrie(&tr)
     defer delete(s)
@@ -204,10 +204,10 @@ test_getAllWithPrefix :: proc(t: ^testing.T) {
   using trie
   tr := makeTrie(int, int)
   defer deleteTrie(&tr)
-  setItem(&tr, "--test", 0)
-  setItem(&tr, "--test1", 1)
-  setItem(&tr, "--test2", 2)
-  setItem(&tr, "--option", 3)
+  setValue(&tr, "--test", 0)
+  setValue(&tr, "--test1", 1)
+  setValue(&tr, "--test2", 2)
+  setValue(&tr, "--option", 3)
   {
     prefix := "--test"
     {
