@@ -84,27 +84,27 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
   for alloc in allocs {
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"-v", "--verbose"},
+        flags = []string{"-v", "--verbose"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
         allocator = alloc,
       )
       tc.expect(t, ok)
-      tc.expect(t, len(ao.option_strings) != 0)
+      tc.expect(t, len(ao.flags) != 0)
       tc.expect(t, len(ao.dest) != 0)
       tc.expect(t, ao.dest == "verbose")
       tc.expect(t, len(ao.help) != 0)
       usage := (&ao)
       deleteArgumentOption(&ao)
-      tc.expect(t, len(ao.option_strings) == 0)
+      tc.expect(t, len(ao.flags) == 0)
       tc.expect(t, len(ao.dest) == 0)
       tc.expect(t, len(ao.help) == 0)
       tc.expect(t, ao._cache_usage == nil)
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{},
+        flags = []string{},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -114,7 +114,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"-"},
+        flags = []string{"-"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -124,7 +124,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"--"},
+        flags = []string{"--"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -134,7 +134,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"---"},
+        flags = []string{"---"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -144,7 +144,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"abc"},
+        flags = []string{"abc"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -154,7 +154,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"abc", "def"},
+        flags = []string{"abc", "def"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -164,7 +164,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"abc", "--def"},
+        flags = []string{"abc", "--def"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -174,7 +174,7 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"abc", "-d"},
+        flags = []string{"abc", "-d"},
         action = ArgumentAction.StoreTrue,
         required = true,
         help = "Make program more verbose",
@@ -222,7 +222,7 @@ test_getUsageString :: proc(t: ^testing.T) {
   for alloc in allocs {
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"-l"},
+        flags = []string{"-l"},
         action = ArgumentAction.Store,
         required = false,
         help = "Make program more verbose",
@@ -236,7 +236,7 @@ test_getUsageString :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"-l", "--long"},
+        flags = []string{"-l", "--long"},
         action = ArgumentAction.Store,
         required = true,
         help = "0123456789\n0123456789",
@@ -250,14 +250,7 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_usage, usage))
     }
     {
-      ao, ok := makeArgumentOption(
-        option_strings = []string{"pos"},
-        action = ArgumentAction.Store,
-        required = true,
-        help = "help",
-        allocator = alloc,
-        nargs = 3,
-      )
+      ao, ok := makeArgumentOption(flags = []string{"pos"}, action = ArgumentAction.Store, required = true, help = "help", allocator = alloc, nargs = 3)
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       usage := _getUsageString(&ao)
@@ -273,13 +266,7 @@ test_getHelpCache :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      ao, ok := makeArgumentOption(
-        option_strings = []string{"-l"},
-        action = ArgumentAction.Store,
-        required = true,
-        help = "0123456789\n0123456789",
-        allocator = alloc,
-      )
+      ao, ok := makeArgumentOption(flags = []string{"-l"}, action = ArgumentAction.Store, required = true, help = "0123456789\n0123456789", allocator = alloc)
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
@@ -288,7 +275,7 @@ test_getHelpCache :: proc(t: ^testing.T) {
     }
     {
       ao, ok := makeArgumentOption(
-        option_strings = []string{"-l", "--long"},
+        flags = []string{"-l", "--long"},
         action = ArgumentAction.Store,
         required = true,
         help = "0123456789\n0123456789",
@@ -302,14 +289,7 @@ test_getHelpCache :: proc(t: ^testing.T) {
       tc.expect(t, expected_help_cache == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_help_cache, help_cache))
     }
     {
-      ao, ok := makeArgumentOption(
-        option_strings = []string{"pos"},
-        action = ArgumentAction.Store,
-        required = true,
-        help = "help",
-        allocator = alloc,
-        nargs = 3,
-      )
+      ao, ok := makeArgumentOption(flags = []string{"pos"}, action = ArgumentAction.Store, required = true, help = "help", allocator = alloc, nargs = 3)
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)

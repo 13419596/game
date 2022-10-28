@@ -12,8 +12,8 @@ import tc "tests:common"
 @(test)
 test_ArgumentParser :: proc(t: ^testing.T) {
   test_makeArgumentParser(t)
-  // test_addArgument(t)
-  // test_getUsage(t)
+  test_addArgument(t)
+  test_getUsage(t)
 }
 
 @(test)
@@ -36,30 +36,34 @@ test_makeArgumentParser :: proc(t: ^testing.T) {
 @(test)
 test_addArgument :: proc(t: ^testing.T) {
   using argparse
-  {
-    ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog")
-    defer deleteArgumentParser(&ap)
+  using argparse
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  for alloc in allocs {
     {
-      ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-      tc.expect(t, ok)
+      ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      {
+        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, ok)
+      }
+      {
+        /// should conflict with previous
+        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, !ok)
+      }
     }
     {
-      /// should conflict with previous
-      ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-      tc.expect(t, !ok)
-    }
-  }
-  {
-    // test again, but with temp_allocator
-    ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = context.temp_allocator)
-    {
-      ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-      tc.expect(t, ok)
-    }
-    {
-      /// should conflict with previous
-      ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-      tc.expect(t, !ok)
+      // test again, but with temp_allocator
+      ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
+      {
+        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, ok)
+      }
+      {
+        /// should conflict with previous
+        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, !ok)
+      }
     }
   }
 }
@@ -67,11 +71,16 @@ test_addArgument :: proc(t: ^testing.T) {
 @(test)
 test_getUsage :: proc(t: ^testing.T) {
   using argparse
-  {
-    expected_usage := "usage PROG [-h]"
-    ap, ap_ok := makeArgumentParser(prog = "PROG", description = "desc", epilog = "epilog")
-    defer deleteArgumentParser(&ap)
-    usage := getUsage(&ap)
-    tc.expect(t, expected_usage == usage, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_usage, usage))
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  for alloc in allocs {
+    {
+      expected_usage := "usage PROG [-h] --long LONG pos pos pos"
+      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "desc", epilog = "epilog", allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      addArgument(self = &ap, flags = {"--long"}, required = true, nargs = 1)
+      addArgument(self = &ap, flags = {"pos"}, required = true, nargs = 3)
+      usage := getUsage(&ap)
+      tc.expect(t, expected_usage == usage, fmt.tprintf("\nExpected:\"%v\".\nGot     :\"%v\"", expected_usage, usage))
+    }
   }
 }

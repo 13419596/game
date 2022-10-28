@@ -60,7 +60,7 @@ makeArgumentParser :: proc(
   if add_help {
     ok = addArgument(
       self = &out,
-      option_strings = {fmt.tprintf("%vh", prefix_rune), fmt.tprintf("%v%vhelp", prefix_rune, prefix_rune)},
+      flags = {fmt.tprintf("%vh", prefix_rune), fmt.tprintf("%v%vhelp", prefix_rune, prefix_rune)},
       action = .Help,
       help = "show this help message and exit",
     )
@@ -103,7 +103,7 @@ deleteArgumentParser :: proc(self: $T/^ArgumentParser) {
 
 addArgument :: proc(
   self: $T/^ArgumentParser,
-  option_strings: []string,
+  flags: []string,
   action := ArgumentAction.Store,
   nargs := Maybe(int){},
   required := false,
@@ -111,7 +111,7 @@ addArgument :: proc(
   help := Maybe(string){},
 ) -> bool {
   arg_option, arg_ok := makeArgumentOption(
-    option_strings = option_strings,
+    flags = flags,
     dest = dest,
     nargs = nargs,
     action = action,
@@ -144,7 +144,7 @@ getUsage :: proc(self: $T/^ArgumentParser) -> string {
   lines := make([dynamic]string)
   // print keywords first
   usage_pieces := make([dynamic]string)
-  append(&usage_pieces, fmt.tprintf("usage: %v ", self.prog))
+  append(&usage_pieces, fmt.tprintf("usage %v", self.prog))
   for option in &self.options {
     if !option._is_positional {
       append(&usage_pieces, _getUsageString(&option))
@@ -156,7 +156,7 @@ getUsage :: proc(self: $T/^ArgumentParser) -> string {
       append(&usage_pieces, _getUsageString(&option))
     }
   }
-  out := join(usage_pieces[:], "", self._allocator)
+  out := join(usage_pieces[:], " ", self._allocator)
   self._cache_usage = out
   return out
 }

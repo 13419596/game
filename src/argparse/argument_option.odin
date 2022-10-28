@@ -18,7 +18,7 @@ ArgumentOptionType :: enum {
 }
 
 ArgumentOption :: struct {
-  option_strings: []string,
+  flags:          []string,
   dest:           string,
   nargs:          int,
   constant_value: any,
@@ -36,7 +36,7 @@ ArgumentOption :: struct {
 
 @(require_results)
 makeArgumentOption :: proc(
-  option_strings: []string,
+  flags: []string,
   dest: Maybe(string) = nil,
   nargs: Maybe(int) = nil,
   action := ArgumentAction.Store,
@@ -48,7 +48,7 @@ makeArgumentOption :: proc(
   out: ArgumentOption,
   ok: bool,
 ) {
-  ok = _areOptionStringsOkay(option_strings, prefix)
+  ok = _areOptionStringsOkay(flags, prefix)
   if !ok {
     return
   }
@@ -90,16 +90,16 @@ makeArgumentOption :: proc(
     return
   }
   {
-    tmp_option_strings := make([dynamic]string, 0, len(option_strings), allocator)
-    for _, idx in option_strings {
-      append(&tmp_option_strings, _replaceRunes(option_strings[idx], {prefix}, prefix, allocator))
+    tmp_flags := make([dynamic]string, 0, len(flags), allocator)
+    for _, idx in flags {
+      append(&tmp_flags, _replaceRunes(flags[idx], {prefix}, prefix, allocator))
     }
-    out.option_strings = tmp_option_strings[:]
+    out.flags = tmp_flags[:]
   }
   if dest_string, mdest_ok := dest.?; mdest_ok {
     out.dest = dest_string
   } else {
-    out.dest, ok = _getDestFromOptions(out.option_strings, prefix)
+    out.dest, ok = _getDestFromOptions(out.flags, prefix)
     if !ok {
       deleteArgumentOption(&out)
       return
@@ -108,7 +108,7 @@ makeArgumentOption :: proc(
   if shelp, ok := help.?; ok {
     out.help = strings.clone(shelp, allocator)
   }
-  out._is_positional = _isPositionalOption(out.option_strings[0])
+  out._is_positional = _isPositionalOption(out.flags[0])
   if out._is_positional {
     if out.nargs <= 0 {
       log.errorf("Argument is positional, but nargs is invalid. Expected >0. Got:%v", out.nargs)
@@ -159,11 +159,11 @@ deleteArgumentOption :: proc(self: $T/^ArgumentOption) {
   if self == nil {
     return
   }
-  for _, idx in self.option_strings {
-    delete(self.option_strings[idx], self._allocator)
+  for _, idx in self.flags {
+    delete(self.flags[idx], self._allocator)
   }
-  delete(self.option_strings, self._allocator)
-  self.option_strings = {}
+  delete(self.flags, self._allocator)
+  self.flags = {}
   delete(self.dest, self._allocator)
   self.dest = {}
   delete(self.help, self._allocator)
@@ -334,7 +334,7 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
     return usage
   }
   context.allocator = self._allocator
-  option0 := len(self.option_strings) > 0 ? self.option_strings[0] : ""
+  option0 := len(self.flags) > 0 ? self.flags[0] : ""
   out: string = ""
   if self._is_positional {
     pieces := make([dynamic]string, self.nargs)
@@ -347,7 +347,6 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
     if !self.required {
       append(&line, "[")
     }
-    log.infof("%v --- ", _getOptionType(option0))
     append(&line, option0)
     if self.nargs > 0 {
       opt_u := fmt.tprintf(" %v", strings.to_upper(self.dest))
@@ -374,7 +373,7 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_wid
     vars = repeat(dest_u, self.nargs)
   }
   opt_vars := make([dynamic]string)
-  for option, idx in self.option_strings {
+  for option, idx in self.flags {
     append(&opt_vars, fmt.tprintf("%v%v", option, vars))
   }
   all_opt_vars := join(opt_vars[:], ", ")
