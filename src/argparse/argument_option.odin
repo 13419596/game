@@ -243,7 +243,7 @@ _areOptionStringsOkay :: proc(options: []string, prefix := _DEFAULT_PREFIX_RUNE)
     case .Long:
       has_short_or_long = true
       if has_positional {
-        log.errorf("Cannot mix positional and keyword options in a single argument. options[%v]:\"%vG\"", idx, option)
+        log.errorf("Cannot mix positional and keyword options in a single argument. options[%v]:\"%v\"", idx, option)
         ok = false
       }
     }
