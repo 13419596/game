@@ -18,7 +18,6 @@ NumTokens :: struct {
 NargsType :: union {
   int,
   string,
-  // rune,
 }
 
 ArgumentFlagType :: enum {
@@ -127,8 +126,7 @@ deleteArgumentOption :: proc(self: $T/^ArgumentOption) {
   }
   delete(self.flags, self._allocator)
   self.flags = {}
-  delete(self.dest, self._allocator)
-  self.dest = {}
+  self.dest = ""
   delete(self.help, self._allocator)
   self.help = {}
   if usage, ok := self._cache_usage.?; ok {
@@ -258,8 +256,7 @@ _replaceRunes :: proc(s: string, old_runes: []rune, replacement: $R, allocator :
 
 /////////////////////////////
 
-@(require_results)
-_getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> (out: string, ok: bool) {
+_getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> (out: string, ok: bool) {
   // Assumes that flags is non-empty
   using strings
   out = ""
@@ -288,20 +285,7 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, 
     log.errorf("Could not determine first non-prefix index in flag:\"%v\"", flag)
     return
   }
-  flag = flag[first_non_prefix_index:]
-  out = clone(flag, allocator)
-  // Now replace every [^a-zA-Z_] with "_"
-  //pieces := make([dynamic]string, context.temp_allocator)
-  //start_idx := 0
-  //for rn, idx in flag {
-  //  val := int(rn)
-  //  if (48 <= val && val < 58) || (65 <= val && val < 91) || (97 <= val && val < 123) {
-  //    append(&pieces, flag[idx:idx + 1])
-  //  } else {
-  //    append(&pieces, "_")
-  //  }
-  //}
-  //out = strings.join(pieces[:], "", allocator)
+  out = flag[first_non_prefix_index:]
   ok = true
   return
 }

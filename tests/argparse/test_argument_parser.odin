@@ -98,8 +98,8 @@ test_getHelp :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      expected_help := "usage PROG [-h] --long LONG pos pos pos\n\npositional arguments:\n  pos                   \n\nkeyword arguments:\n  -h, --help            show this help message and exit\n  --long LONG           \n\nEPILOG"
-      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "desc", epilog = "EPILOG", allocator = alloc)
+      expected_help := "usage PROG [-h] --long LONG pos pos pos\n\ndescription\n\npositional arguments:\n  pos                   \n\nkeyword arguments:\n  -h, --help            show this help message and exit\n  --long LONG           \n\nEPILOG"
+      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
       defer deleteArgumentParser(&ap)
       addArgument(self = &ap, flags = {"--long"}, required = true, nargs = 1)
       addArgument(self = &ap, flags = {"pos"}, required = true, nargs = 3)

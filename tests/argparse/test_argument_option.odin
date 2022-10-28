@@ -192,30 +192,23 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
 @(test)
 test_getDestFromFlags :: proc(t: ^testing.T) {
   using argparse
-  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
-  for alloc in allocs {
-    {
-      out, ok := _getDestFromFlags(flags = {}, allocator = alloc)
-      defer delete(out, alloc)
-      tc.expect(t, !ok)
-    }
-    {
-      out, ok := _getDestFromFlags(flags = {"--"}, allocator = alloc)
-      defer delete(out, alloc)
-      tc.expect(t, !ok)
-    }
-    {
-      out, ok := _getDestFromFlags(flags = {"-l", "--long"}, allocator = alloc)
-      defer delete(out, alloc)
-      tc.expect(t, ok)
-      tc.expect(t, out == "long")
-    }
-    {
-      out, ok := _getDestFromFlags(flags = {"--long", "--other", "-s"}, allocator = alloc)
-      defer delete(out, alloc)
-      tc.expect(t, ok)
-      tc.expect(t, out == "long")
-    }
+  {
+    out, ok := _getDestFromFlags(flags = {})
+    tc.expect(t, !ok)
+  }
+  {
+    out, ok := _getDestFromFlags(flags = {"--"})
+    tc.expect(t, !ok)
+  }
+  {
+    out, ok := _getDestFromFlags(flags = {"-l", "--long"})
+    tc.expect(t, ok)
+    tc.expect(t, out == "long")
+  }
+  {
+    out, ok := _getDestFromFlags(flags = {"--long", "--other", "-s"})
+    tc.expect(t, ok)
+    tc.expect(t, out == "long")
   }
 }
 

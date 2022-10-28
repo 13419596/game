@@ -209,6 +209,10 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
   }
   lines := make([dynamic]string)
   append(&lines, getUsage(self))
+  if len(self.description) > 0 {
+    append(&lines, "")
+    append(&lines, self.description)
+  }
   if any_positionals {
     append(&lines, "")
     append(&lines, "positional arguments:")
@@ -238,18 +242,80 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
 
 ////////////////////////////////////////
 
+ParsedArgs :: struct {
+  known:      map[string][dynamic]string,
+  unknown:    [dynamic]string,
+  _allocator: runtime.Allocator,
+}
+
+makeParsedArgs :: proc(allocator := context.allocator) -> ParsedArgs {
+  out := ParsedArgs {
+    known      = make(map[string][dynamic]string, 0, allocator),
+    unknown    = make([dynamic]string, allocator),
+    _allocator = allocator,
+  }
+  return out
+}
+
+deleteParsedArgs :: proc(self: $T/^ParsedArgs) {
+  if self == nil {
+    return
+  }
+  for k, v in &self.known {
+    delete(v, self._allocator)
+  }
+  delete(self.known)
+  delete(self.unknown, self._allocator)
+}
+
+_getUnambiguousOption :: proc(self: $T/^ArgumentParser, arg: string) -> ^ArgumentOption {
+  context.allocator = context.temp_allocator
+  out: ^ArgumentOption = nil
+  found_values := trie.getAllValuesWithPrefix(&self._option_trie, arg)
+  found_arg_idx := -1
+  if len(found_values) == 1 {
+    //unambiguous
+    found_arg_idx = found_values[0]
+    if found_arg_idx < 0 || found_arg_idx >= len(self.options) {
+      log.warnf("Found invalid index. Skipping")
+    } else {
+      return &self.options[found_arg_idx]
+    }
+  } else {
+    ambiguous_args := make([dynamic]string)
+    for found_idx, idx in found_values {
+      if found_idx < 0 || found_idx >= len(self.options) {
+        append(&ambiguous_args, "<invalid>")
+      } else {
+        option := &self.options[found_idx]
+        for flag in option.flags {
+          append(&ambiguous_args, fmt.tprintf("\"%v\"", flag))
+        }
+      }
+    }
+    log.errorf("Found ambiguous arguments for arg:\"%v\". Options:[%v]", arg, join(ambiguous_args, ", "))
+  }
+}
+
+/*
 @(require_results)
 parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := context.allocator) -> (out: map[string]string, ok: bool) {
   context.allocator = context.temp_allocator
-  out := make(map[string]string, allocator)
-  arg_idx := 0
-  unknown_args := make([dynamic]string, allocator)
+  out := makeParsedArgs(allocator=allocator)
   ok = true
+  arg_idx := 0
+  used_args :=
   arg_loop: for arg_idx < len(args) {
     arg := args[arg_idx]
     arg_idx += 1
-    found_values := trie.getAllValuesWithPrefix(&self._option_trie, arg)
-    found_arg_idx := -1
+    // found_values := trie.getAllValuesWithPrefix(&self._option_trie, arg)
+    // found_arg_idx := -1
+    flag_type := _getFlagType(arg, )
+    opt_type := _getOp
+    option := _getUnambiguousOption(self, arg)
+    if option==nil {
+      append(&out.unknown_args)
+    }
     switch len(found_values) {
     case 0:
       log.debugf("Unknown argument:\"%v\"", arg)
@@ -314,3 +380,4 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
   }
   return
 }
+*/
