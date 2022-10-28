@@ -11,71 +11,9 @@ import tc "tests:common"
 
 @(test)
 test_ArgumentOption :: proc(t: ^testing.T) {
-  test_isShortFlag(t)
-  test_isLongFlag(t)
-  test_isPositionalFlag(t)
-  test_getFlagType(t)
   test_makeArgumentOption(t)
-  test_getDestFromFlags(t)
-  test_replaceRunes(t)
   test_getUsageString(t)
   test_getHelpCache(t)
-  test_parseNargs(t)
-}
-
-@(test)
-test_isShortFlag :: proc(t: ^testing.T) {
-  using argparse
-  tc.expect(t, !_isShortFlag(""))
-  tc.expect(t, !_isShortFlag("-"))
-  tc.expect(t, !_isShortFlag("--"))
-  tc.expect(t, _isShortFlag("-a"))
-  tc.expect(t, !_isShortFlag("--a"))
-  tc.expect(t, !_isShortFlag("-a-"))
-  tc.expect(t, !_isShortFlag("--ab"))
-  tc.expect(t, !_isShortFlag("a"))
-  tc.expect(t, !_isShortFlag("ab"))
-}
-
-@(test)
-test_isLongFlag :: proc(t: ^testing.T) {
-  using argparse
-  tc.expect(t, !_isLongFlag(""))
-  tc.expect(t, !_isLongFlag("-"))
-  tc.expect(t, !_isLongFlag("--"))
-  tc.expect(t, !_isLongFlag("-a"))
-  tc.expect(t, _isLongFlag("--a"))
-  tc.expect(t, _isLongFlag("-a-"))
-  tc.expect(t, _isLongFlag("--ab"))
-  tc.expect(t, !_isLongFlag("a"))
-  tc.expect(t, !_isLongFlag("ab"))
-}
-@(test)
-test_isPositionalFlag :: proc(t: ^testing.T) {
-  using argparse
-  tc.expect(t, !_isPositionalFlag(""))
-  tc.expect(t, !_isPositionalFlag("-"))
-  tc.expect(t, !_isPositionalFlag("--"))
-  tc.expect(t, !_isPositionalFlag("---"))
-  tc.expect(t, !_isPositionalFlag("-a"))
-  tc.expect(t, !_isPositionalFlag("--a"))
-  tc.expect(t, !_isPositionalFlag("--ab"))
-  tc.expect(t, _isPositionalFlag("a"))
-  tc.expect(t, _isPositionalFlag("ab"))
-}
-@(test)
-test_getFlagType :: proc(t: ^testing.T) {
-  using argparse
-  tc.expect(t, _getFlagType("") == .Invalid)
-  tc.expect(t, _getFlagType("-") == .Invalid)
-  tc.expect(t, _getFlagType("--") == .Invalid)
-  tc.expect(t, _getFlagType("---") == .Invalid)
-  tc.expect(t, _getFlagType("-a") == .Short)
-  tc.expect(t, _getFlagType("-a-") == .Long)
-  tc.expect(t, _getFlagType("--a") == .Long)
-  tc.expect(t, _getFlagType("--ab") == .Long)
-  tc.expect(t, _getFlagType("a") == .Positional)
-  tc.expect(t, _getFlagType("ab") == .Positional)
 }
 
 /////////////////////////////////////////////////////////
@@ -186,29 +124,6 @@ test_makeArgumentOption :: proc(t: ^testing.T) {
       )
       tc.expect(t, !ok)
     }
-  }
-}
-
-@(test)
-test_getDestFromFlags :: proc(t: ^testing.T) {
-  using argparse
-  {
-    out, ok := _getDestFromFlags(flags = {})
-    tc.expect(t, !ok)
-  }
-  {
-    out, ok := _getDestFromFlags(flags = {"--"})
-    tc.expect(t, !ok)
-  }
-  {
-    out, ok := _getDestFromFlags(flags = {"-l", "--long"})
-    tc.expect(t, ok)
-    tc.expect(t, out == "long")
-  }
-  {
-    out, ok := _getDestFromFlags(flags = {"--long", "--other", "-s"})
-    tc.expect(t, ok)
-    tc.expect(t, out == "long")
   }
 }
 
@@ -374,44 +289,3 @@ test_getHelpCache :: proc(t: ^testing.T) {
 }
 
 //////////////////////////////////////
-
-
-@(test)
-test_replaceRunes :: proc(t: ^testing.T) {
-  using argparse
-  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
-  for alloc in allocs {
-    {
-      input := "--a/b"
-      expected := "--a-b"
-      output := _replaceRunes(input, {'-', '/'}, '-', alloc)
-      defer delete(output)
-    }
-  }
-}
-
-@(test)
-test_parseNargs :: proc(t: ^testing.T) {
-  using argparse
-  {
-    values := []string{"?", "*", "+", "asdf", "?d"}
-    oks := []bool{true, true, true, false, false}
-    for value, idx in values {
-      lbub, ok := _parseNargs({}, value)
-      tc.expect(t, ok == oks[idx])
-    }
-  }
-  {
-    for value in -3 ..= 3 {
-      lbub, ok := _parseNargs({}, value)
-      expected_ok := value >= 0
-      tc.expect(t, ok == expected_ok)
-    }
-  }
-  {
-    for action in ArgumentAction {
-      lbub, ok := _parseNargs(action, {})
-      tc.expect(t, ok == true)
-    }
-  }
-}

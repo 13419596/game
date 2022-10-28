@@ -15,6 +15,7 @@ test_ArgumentParser :: proc(t: ^testing.T) {
   test_addArgument(t)
   test_getUsage(t)
   test_getHelp(t)
+  // test_getUnambiguousKeywordOption(t)
 }
 
 @(test)
@@ -109,3 +110,34 @@ test_getHelp :: proc(t: ^testing.T) {
     }
   }
 }
+
+/////////////////////////////////////////
+/*
+@(test)
+test_getUnambiguousKeywordOption :: proc(t: ^testing.T) {
+  using argparse
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  for alloc in allocs {
+    {
+      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      addArgument(&ap, {"--abc0"})
+      addArgument(&ap, {"--abc1"})
+      addArgument(&ap, {"--abc2"})
+      addArgument(&ap, {"--abbrieviation", "--abby"})
+      fuko := _getUnambiguousKeywordOption(&ap, "--abc0")
+      tc.expect(t, fuko.option != nil)
+      fuko = _getUnambiguousKeywordOption(&ap, "--abc")
+      tc.expect(t, fuko.option == nil)
+      fuko = _getUnambiguousKeywordOption(&ap, "--abbriev")
+      tc.expect(t, fuko.option != nil)
+      tc.expect(t, len(fuko.arg) <= len(fuko.keyword))
+      fuko = _getUnambiguousKeywordOption(&ap, "--abbrieviation")
+      tc.expect(t, fuko.option != nil)
+      tc.expect(t, len(fuko.arg) == len(fuko.keyword))
+    }
+  }
+}
+
+*/

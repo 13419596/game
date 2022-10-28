@@ -18,6 +18,9 @@ main :: proc() {
   defer log.destroy_multi_logger(&multi_logger)
   context.logger = multi_logger
 
+  test_ArgumentOther(&t)
+  test_ArgumentFlags(&t)
+  test_ArgumentNumTokens(&t)
   test_ArgumentOption(&t)
   test_ArgumentParser(&t)
   tc.report(&t)

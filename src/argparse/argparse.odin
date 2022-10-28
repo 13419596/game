@@ -241,7 +241,86 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
 }
 
 ////////////////////////////////////////
+/*
+@(require_results, private = "file")
+_runesToString :: proc(values: []int, allocator := context.allocator) -> string {
+  using strings
+  out := make([dynamic]string, context.temp_allocator)
+  for v in values {
+    append(&out, fmt.tprintf("%v", rune(v)))
+  }
+  return join(out[:], "", allocator)
+}
 
+_FoundUnambiguousKeywordOption :: struct {
+  option:  ^ArgumentOption,
+  arg:     string,
+  keyword: string,
+}
+
+_getUnambiguousKeywordOption :: proc(self: $T/^ArgumentParser, arg: string) -> _FoundUnambiguousKeywordOption {
+  using strings
+  context.allocator = context.temp_allocator
+  out := _FoundUnambiguousKeywordOption {
+    arg = arg,
+  }
+  found_kvs := trie.getAllKeyValuesWithPrefix(&self._option_trie, arg)
+  if len(found_kvs) == 1 {
+    //unambiguous
+    found_arg_idx := found_kvs[0].value
+    if found_arg_idx < 0 || found_arg_idx >= len(self.options) {
+      log.warnf("Found invalid index. Skipping")
+    } else {
+      out.option = &self.options[found_arg_idx]
+      // find expected keyword in option and reference it that way (to prevent any allocations)
+      expected_keyword := concatenate({arg, _runesToString(found_kvs[0].key)})
+      for flag in &out.option.flags {
+        if flag == expected_keyword {
+          out.keyword = flag
+          break
+        }
+      }
+    }
+  } else {
+    ambiguous_args := make([dynamic]string)
+    for kv in found_kvs {
+      append(&ambiguous_args, fmt.tprintf("\"%v%v\"", arg, _runesToString(kv.key)))
+    }
+    log.errorf("Found ambiguous arguments for arg:\"%v\". Options:[%v]", arg, join(ambiguous_args[:], ", "))
+  }
+  return out
+}
+
+ParsedArgumentOption :: struct {
+  arg:          string,
+  arg_type:     ArgumentFlagType,
+  trailing_arg: string,
+  option:       ^ArgumentOption,
+}
+
+_determineArgumentOption :: proc(self: $T/^ArgumentParser, arg: string) -> (out: ^ArgumentOption, arg_is_short: bool, trailing_arg: string) {
+  out := ParsedArgumentOption {
+    arg      = arg,
+    arg_type = _getFlagType(arg, self.flag),
+  }
+  // switch out.arg_type {
+  //   case .Short:
+
+  //   case .Long:
+  //   case .Invalid:
+  //     case .
+  // }
+  // if out.arg_type == .Short || out.arg_type == .Long {
+  //   fuko := _getUnambiguousKeywordOption(self, arg)
+  //   out.option = fuko.option
+  // } else {
+
+  // }
+  return out
+}
+*/
+
+/*
 ParsedArgs :: struct {
   known:      map[string][dynamic]string,
   unknown:    [dynamic]string,
@@ -267,35 +346,8 @@ deleteParsedArgs :: proc(self: $T/^ParsedArgs) {
   delete(self.known)
   delete(self.unknown, self._allocator)
 }
+*/
 
-_getUnambiguousOption :: proc(self: $T/^ArgumentParser, arg: string) -> ^ArgumentOption {
-  context.allocator = context.temp_allocator
-  out: ^ArgumentOption = nil
-  found_values := trie.getAllValuesWithPrefix(&self._option_trie, arg)
-  found_arg_idx := -1
-  if len(found_values) == 1 {
-    //unambiguous
-    found_arg_idx = found_values[0]
-    if found_arg_idx < 0 || found_arg_idx >= len(self.options) {
-      log.warnf("Found invalid index. Skipping")
-    } else {
-      return &self.options[found_arg_idx]
-    }
-  } else {
-    ambiguous_args := make([dynamic]string)
-    for found_idx, idx in found_values {
-      if found_idx < 0 || found_idx >= len(self.options) {
-        append(&ambiguous_args, "<invalid>")
-      } else {
-        option := &self.options[found_idx]
-        for flag in option.flags {
-          append(&ambiguous_args, fmt.tprintf("\"%v\"", flag))
-        }
-      }
-    }
-    log.errorf("Found ambiguous arguments for arg:\"%v\". Options:[%v]", arg, join(ambiguous_args, ", "))
-  }
-}
 
 /*
 @(require_results)
