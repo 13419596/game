@@ -14,6 +14,7 @@ test_ArgumentParser :: proc(t: ^testing.T) {
   test_makeArgumentParser(t)
   test_addArgument(t)
   test_getUsage(t)
+  test_getHelp(t)
 }
 
 @(test)
@@ -81,6 +82,25 @@ test_getUsage :: proc(t: ^testing.T) {
       addArgument(self = &ap, flags = {"pos"}, required = true, nargs = 3)
       usage := getUsage(&ap)
       tc.expect(t, expected_usage == usage, fmt.tprintf("\nExpected:\"%v\".\nGot     :\"%v\"", expected_usage, usage))
+    }
+  }
+}
+
+
+@(test)
+test_getHelp :: proc(t: ^testing.T) {
+  using argparse
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  for alloc in allocs {
+    {
+      expected_help := "usage PROG [-h] --long LONG pos pos pos\n\npositional arguments:\n  pos                   \n\nkeyword arguments:\n  -h, --help            show this help message and exit\n  --long LONG           \n\nEPILOG"
+      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "desc", epilog = "EPILOG", allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      addArgument(self = &ap, flags = {"--long"}, required = true, nargs = 1)
+      addArgument(self = &ap, flags = {"pos"}, required = true, nargs = 3)
+      help := getHelp(&ap)
+      tc.expect(t, len(expected_help) == len(help), fmt.tprintf("Expected len:%v Got len:%v", len(expected_help), len(help)))
+      tc.expect(t, expected_help == help, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\"\nGot:\"\"\"\n%v\n\"\"\"", expected_help, help))
     }
   }
 }

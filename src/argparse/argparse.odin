@@ -193,7 +193,7 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
     append(&lines, "positional arguments:")
     for option in &self.options {
       if option._is_positional {
-        append(&usage_pieces, _getHelpCache(&option))
+        append(&lines, _getHelpCache(&option))
       }
     }
   }
@@ -202,7 +202,7 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
     append(&lines, "keyword arguments:")
     for option in &self.options {
       if !option._is_positional {
-        append(&usage_pieces, _getHelpCache(&option))
+        append(&lines, _getHelpCache(&option))
       }
     }
   }
