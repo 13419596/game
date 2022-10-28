@@ -73,7 +73,7 @@ makeArgumentOption :: proc(
   dest: Maybe(string) = nil,
   nargs := NargsType{},
   action := ArgumentAction.Store,
-  required: bool = false,
+  required := Maybe(bool){},
   help: Maybe(string) = nil,
   prefix := _DEFAULT_PREFIX_RUNE,
   allocator := context.allocator,
@@ -81,14 +81,13 @@ makeArgumentOption :: proc(
   out: ArgumentOption,
   ok: bool,
 ) {
+  ok = false
   if !_areFlagsOkay(flags, prefix) {
     ok = false
     return
   }
-  ok = false
   out = ArgumentOption {
     action       = action,
-    required     = required,
     flags        = _cleanFlags(flags, prefix, allocator),
     _allocator   = allocator,
     _is_composed = isArgumentActionComposed(action),
@@ -120,9 +119,21 @@ makeArgumentOption :: proc(
   if shelp, ok := help.?; ok {
     out.help = strings.clone(shelp, allocator)
   }
-  if out._is_positional && !out.required {
-    log.warnf("`required` is an invalid argument for positional argument. Defaulting to true")
-    out.required = true
+  if req, req_ok := required.?; req_ok {
+    // specified
+    if req {
+      out.required = true
+    } else {
+      if out._is_positional {
+        log.warnf("`required` is an invalid argument for positional argument. Defaulting to true")
+        out.required = true
+      } else {
+        out.required = false
+      }
+    }
+  } else {
+    // unspecified
+    out.required = out._is_positional ? true : false
   }
   ok = true
   return
@@ -141,6 +152,17 @@ deleteArgumentOption :: proc(self: $T/^ArgumentOption) {
   self.dest = {}
   delete(self.help, self._allocator)
   self.help = {}
+  if usage, ok := self._cache_usage.?; ok {
+    delete(usage, self._allocator)
+    self._cache_usage = {}
+  }
+  if help, ok := self._cache_help.?; ok {
+    delete(help, self._allocator)
+    self._cache_help = {}
+  }
+}
+
+_clearCache :: proc(self: $T/^ArgumentOption) {
   if usage, ok := self._cache_usage.?; ok {
     delete(usage, self._allocator)
     self._cache_usage = {}
@@ -308,6 +330,7 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, 
 _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE) -> string {
   using strings
   if usage, ok := self._cache_usage.?; ok {
+    log.warnf("Returning cache usage")
     return usage
   }
   context.allocator = self._allocator
@@ -319,7 +342,14 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
       append(&pieces, flag0)
     }
     if upper, upper_ok := self.num_tokens.upper.?; upper_ok {
-      // TODO ---- 
+      extra_optional := max(0, upper - self.num_tokens.lower)
+      for idx in 0 ..< extra_optional {
+        append(&pieces, concatenate({"[", flag0}))
+      }
+      if len(pieces) > 0 {
+        tmp := clone(pieces[len(pieces) - 1])
+        pieces[len(pieces) - 1] = concatenate({tmp, repeat("]", extra_optional)})
+      }
     } else {
       // no bound
       append(&pieces, concatenate({"[", flag0}))
@@ -333,7 +363,6 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
     }
     append(&line, flag0)
     if self.num_tokens.lower > 0 {
-      log.warnf("num tokens:%v ;; ", self.num_tokens)
       append(&line, strings.repeat(concatenate({" ", to_upper(self.dest)}), self.num_tokens.lower))
     }
     if !self.required {
@@ -496,10 +525,6 @@ _isPositionalOptionNumTokensValid :: proc(action: ArgumentAction, num_tokens: Nu
     return false
   case .Store:
   // okay
-  }
-  if num_tokens.lower <= 0 {
-    log.errorf("Argument is positional, but nargs is invalid. Expected >0. Got:%v", num_tokens)
-    return false
   }
   return true
 }

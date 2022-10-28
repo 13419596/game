@@ -106,7 +106,7 @@ addArgument :: proc(
   flags: []string,
   action := ArgumentAction.Store,
   nargs := NargsType{},
-  required := false,
+  required := Maybe(bool){},
   dest := Maybe(string){},
   help := Maybe(string){},
 ) -> bool {
@@ -125,20 +125,22 @@ addArgument :: proc(
     return false
   }
   ok := true
-  for flag, flag_idx in arg_option.flags {
-    found_value, found_ok := trie.getValue(&self._option_trie, flag)
-    if !found_ok {
-      continue
-    }
-    if found_value < 0 || found_value >= len(self.options) {
-      log.errorf("Found conflicting value that corresponds to invalid index:%v.", found_value)
+  if !arg_option._is_positional {
+    for flag, flag_idx in arg_option.flags {
+      found_value, found_ok := trie.getValue(&self._option_trie, flag)
+      if !found_ok {
+        continue
+      }
+      if found_value < 0 || found_value >= len(self.options) {
+        log.errorf("Found conflicting value that corresponds to invalid index:%v.", found_value)
+        ok = false
+        break
+      }
+      conflicting_option := &self.options[found_value]
+      log.errorf("New option flag:\"%v\" conflicts with existing option flags:%v", flag, conflicting_option.flags)
       ok = false
       break
     }
-    conflicting_option := &self.options[found_value]
-    log.errorf("New option flag:\"%v\" conflicts with existing option flags:%v", flag, conflicting_option.flags)
-    ok = false
-    break
   }
   if !ok {
     deleteArgumentOption(&arg_option)

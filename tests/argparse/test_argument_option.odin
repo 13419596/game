@@ -222,7 +222,7 @@ test_getDestFromFlags :: proc(t: ^testing.T) {
 @(test)
 test_getUsageString :: proc(t: ^testing.T) {
   using argparse
-  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  allocs := []runtime.Allocator{context.allocator} // context.temp_allocator}
   for alloc in allocs {
     {
       ao, ok := makeArgumentOption(
@@ -268,6 +268,29 @@ test_getUsageString :: proc(t: ^testing.T) {
       usage := _getUsageString(&ao)
       expected_usage := "pos+ [pos+ ...]"
       tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage, usage))
+    }
+    {
+      ao, ok := makeArgumentOption(flags = []string{"pos*"}, action = ArgumentAction.Store, help = "Make program more verbose", allocator = alloc, nargs = "*")
+      expected_len := 1
+      defer deleteArgumentOption(&ao)
+      tc.expect(t, ok, "Expected to be okay")
+      tc.expect(t, len(ao.flags) == expected_len, fmt.tprintf("Expected len %v. Got len(flags):%v", expected_len, len(ao.flags)))
+      usage := _getUsageString(&ao)
+      expected_usage := "[pos* ...]"
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage, usage))
+    }
+    {
+      ao, ok := makeArgumentOption(flags = []string{"pos?"}, action = ArgumentAction.Store, help = "Make program more verbose", allocator = alloc, nargs = "?")
+      defer deleteArgumentOption(&ao)
+      tc.expect(t, ok)
+      usage1 := _getUsageString(&ao)
+      expected_usage1 := "[pos?]"
+      tc.expect(t, usage1 == expected_usage1, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage1, usage1))
+      ao.num_tokens.upper = 2
+      expected_usage2 := "[pos? [pos?]]"
+      _clearCache(&ao)
+      usage2 := _getUsageString(&ao)
+      tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage2, usage2))
     }
   }
 }
