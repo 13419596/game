@@ -17,8 +17,8 @@ test_ArgumentOption :: proc(t: ^testing.T) {
   test_getFlagType(t)
   test_makeArgumentOption(t)
   test_getDestFromFlags(t)
-  test_getUsageString(t)
   test_replaceRunes(t)
+  test_getUsageString(t)
   test_getHelpCache(t)
   test_parseNargs(t)
 }
@@ -196,23 +196,23 @@ test_getDestFromFlags :: proc(t: ^testing.T) {
   for alloc in allocs {
     {
       out, ok := _getDestFromFlags(flags = {}, allocator = alloc)
-      defer delete(out)
+      defer delete(out, alloc)
       tc.expect(t, !ok)
     }
     {
       out, ok := _getDestFromFlags(flags = {"--"}, allocator = alloc)
-      defer delete(out)
+      defer delete(out, alloc)
       tc.expect(t, !ok)
     }
     {
       out, ok := _getDestFromFlags(flags = {"-l", "--long"}, allocator = alloc)
-      defer delete(out)
+      defer delete(out, alloc)
       tc.expect(t, ok)
       tc.expect(t, out == "long")
     }
     {
       out, ok := _getDestFromFlags(flags = {"--long", "--other", "-s"}, allocator = alloc)
-      defer delete(out)
+      defer delete(out, alloc)
       tc.expect(t, ok)
       tc.expect(t, out == "long")
     }
@@ -292,6 +292,25 @@ test_getUsageString :: proc(t: ^testing.T) {
       usage2 := _getUsageString(&ao)
       tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage2, usage2))
     }
+    {
+      ao, ok := makeArgumentOption(
+        flags = []string{"--pos?"},
+        action = ArgumentAction.Store,
+        help = "Make program more verbose",
+        allocator = alloc,
+        nargs = "?",
+      )
+      defer deleteArgumentOption(&ao)
+      tc.expect(t, ok)
+      usage1 := _getUsageString(&ao)
+      expected_usage1 := "[--pos? [POS?]]"
+      tc.expect(t, usage1 == expected_usage1, fmt.tprintf("Num tokens:%v\nExpected:\"%v\".\n     Got:\"%v\"", ao.num_tokens, expected_usage1, usage1))
+      ao.num_tokens.upper = 2
+      expected_usage2 := "[--pos? [POS? [POS?]]]"
+      _clearCache(&ao)
+      usage2 := _getUsageString(&ao)
+      tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:\"%v\".\n     Got:\"%v\"", ao.num_tokens, expected_usage2, usage2))
+    }
   }
 }
 
@@ -333,6 +352,15 @@ test_getHelpCache :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
       expected_cache_help := "  pos                   help"
+      tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
+    }
+    if false {
+      ao, ok := makeArgumentOption(flags = []string{"--p?"}, action = ArgumentAction.Store, required = true, help = "help", allocator = alloc, nargs = "?")
+      defer deleteArgumentOption(&ao)
+      tc.expect(t, ok)
+      help_cache := _getHelpCache(&ao)
+      log.infof("HELP:\n%v;; nt:%v\nusage:%v", help_cache, ao.num_tokens, _getUsageString(&ao))
+      expected_cache_help := "  --p? [P?]             help"
       tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
     }
   }

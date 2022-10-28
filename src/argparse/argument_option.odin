@@ -39,27 +39,6 @@ ArgumentOption :: struct {
   required:       bool,
   help:           string,
   num_tokens:     NumTokens,
-  /*
-  // In header: <boost/program_flags/value_semantic.hpp>
-
-
-class value_semantic {
-public:
-  // construct/copy/destruct
-  ~value_semantic();
-
-  // public member functions
-  virtual std::string name() const = 0;
-  virtual unsigned min_tokens() const = 0;
-  virtual unsigned max_tokens() const = 0;
-  virtual bool is_composing() const = 0;
-  virtual bool is_required() const = 0;
-  virtual void 
-  parse(boost::any &, const std::vector< std::string > &, bool) const = 0;
-  virtual bool apply_default(boost::any &) const = 0;
-  virtual void notify(const boost::any &) const = 0;
-};
-  */
   _allocator:     runtime.Allocator,
   _is_positional: bool,
   _is_composed:   bool, // multipart
@@ -282,6 +261,7 @@ _replaceRunes :: proc(s: string, old_runes: []rune, replacement: $R, allocator :
 @(require_results)
 _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> (out: string, ok: bool) {
   // Assumes that flags is non-empty
+  using strings
   out = ""
   ok = false
   if len(flags) <= 0 {
@@ -309,42 +289,44 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, 
     return
   }
   flag = flag[first_non_prefix_index:]
+  out = clone(flag, allocator)
   // Now replace every [^a-zA-Z_] with "_"
-  pieces := make([dynamic]string, context.temp_allocator)
-  start_idx := 0
-  for rn, idx in flag {
-    val := int(rn)
-    if (48 <= val && val < 58) || (65 <= val && val < 91) || (97 <= val && val < 123) {
-      append(&pieces, flag[idx:idx + 1])
-    } else {
-      append(&pieces, "_")
-    }
-  }
-  out = strings.join(pieces[:], "", allocator)
+  //pieces := make([dynamic]string, context.temp_allocator)
+  //start_idx := 0
+  //for rn, idx in flag {
+  //  val := int(rn)
+  //  if (48 <= val && val < 58) || (65 <= val && val < 91) || (97 <= val && val < 123) {
+  //    append(&pieces, flag[idx:idx + 1])
+  //  } else {
+  //    append(&pieces, "_")
+  //  }
+  //}
+  //out = strings.join(pieces[:], "", allocator)
   ok = true
   return
 }
 
 /////////////////////////////////////////////////////////
 
-_getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE) -> string {
+_makeUsageString :: proc(
+  self: $T/^ArgumentOption,
+  flag: string,
+  disable_keyword_brackets: bool = false,
+  prefix := _DEFAULT_PREFIX_RUNE,
+  allocator := context.allocator,
+) -> string {
   using strings
-  if usage, ok := self._cache_usage.?; ok {
-    log.warnf("Returning cache usage")
-    return usage
-  }
-  context.allocator = self._allocator
-  flag0 := len(self.flags) > 0 ? self.flags[0] : ""
+  context.allocator = allocator
   out: string = ""
   if self._is_positional {
     pieces := make([dynamic]string)
     for idx in 0 ..< self.num_tokens.lower {
-      append(&pieces, flag0)
+      append(&pieces, flag)
     }
     if upper, upper_ok := self.num_tokens.upper.?; upper_ok {
       extra_optional := max(0, upper - self.num_tokens.lower)
       for idx in 0 ..< extra_optional {
-        append(&pieces, concatenate({"[", flag0}))
+        append(&pieces, concatenate({"[", flag}))
       }
       if len(pieces) > 0 {
         tmp := clone(pieces[len(pieces) - 1])
@@ -352,29 +334,60 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
       }
     } else {
       // no bound
-      append(&pieces, concatenate({"[", flag0}))
+      append(&pieces, concatenate({"[", flag}))
       append(&pieces, "...]")
     }
-    out = join(pieces[:], " ", self._allocator)
+    out = join(pieces[:], " ")
   } else {
     line := make([dynamic]string)
-    if !self.required {
+    add_surrounding_brackets := (!self.required || (self.num_tokens.lower == 0 && self.num_tokens.upper == 0)) && !disable_keyword_brackets
+    if add_surrounding_brackets {
       append(&line, "[")
     }
-    append(&line, flag0)
+    append(&line, flag)
+    udest := to_upper(self.dest)
     if self.num_tokens.lower > 0 {
-      append(&line, strings.repeat(concatenate({" ", to_upper(self.dest)}), self.num_tokens.lower))
+      append(&line, concatenate({"", repeat(concatenate({" ", udest}), self.num_tokens.lower)}))
     }
-    if !self.required {
+    if upper, upper_ok := self.num_tokens.upper.?; upper_ok {
+      extra_optional := max(0, upper - self.num_tokens.lower)
+      for idx in 0 ..< extra_optional {
+        append(&line, concatenate({" [", udest}))
+      }
+      if len(line) > 0 {
+        tmp := clone(line[len(line) - 1])
+        line[len(line) - 1] = concatenate({tmp, repeat("]", extra_optional)})
+      }
+    } else {
+      // no bound
+      append(&line, concatenate({"[", udest}))
+      append(&line, "...]")
+    }
+    if add_surrounding_brackets {
       append(&line, "]")
     }
     out = strings.join(line[:], "")
   }
+  return out
+}
+
+_getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE) -> string {
+  if usage, ok := self._cache_usage.?; ok {
+    return usage
+  }
+  flag0 := len(self.flags) > 0 ? self.flags[0] : ""
+  out := _makeUsageString(self = self, prefix = prefix, flag = flag0, allocator = self._allocator)
   self._cache_usage = out
   return out
 }
 
-_getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width: int = 22, allocator := context.allocator) -> string {
+_getHelpCache :: proc(
+  self: $T/^ArgumentOption,
+  indent := "  ",
+  flag_field_width: int = 22,
+  prefix := _DEFAULT_PREFIX_RUNE,
+  allocator := context.allocator,
+) -> string {
   if help_cache, ok := self._cache_help.?; ok {
     return help_cache
   }
@@ -387,8 +400,13 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width
     }
   }
   opt_vars := make([dynamic]string)
-  for flag, idx in self.flags {
-    append(&opt_vars, fmt.tprintf("%v%v", flag, vars))
+  if self._is_positional {
+    append(&opt_vars, self.flags[0])
+  } else {
+    for flag, idx in self.flags {
+      var := _makeUsageString(self = self, flag = flag, disable_keyword_brackets = true, prefix = prefix, allocator = context.temp_allocator)
+      append(&opt_vars, fmt.tprintf("%v%v", flag, vars))
+    }
   }
   all_opt_vars := join(opt_vars[:], ", ")
   first_line_pieces := make([dynamic]string)
