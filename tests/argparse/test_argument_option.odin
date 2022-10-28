@@ -354,13 +354,27 @@ test_getHelpCache :: proc(t: ^testing.T) {
       expected_cache_help := "  pos                   help"
       tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
     }
-    if false {
+    {
       ao, ok := makeArgumentOption(flags = []string{"--p?"}, action = ArgumentAction.Store, required = true, help = "help", allocator = alloc, nargs = "?")
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
-      log.infof("HELP:\n%v;; nt:%v\nusage:%v", help_cache, ao.num_tokens, _getUsageString(&ao))
       expected_cache_help := "  --p? [P?]             help"
+      tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
+    }
+    {
+      ao, ok := makeArgumentOption(
+        flags = []string{"--a?", "--AA?"},
+        action = ArgumentAction.Store,
+        required = true,
+        help = "help",
+        allocator = alloc,
+        nargs = "?",
+      )
+      defer deleteArgumentOption(&ao)
+      tc.expect(t, ok)
+      help_cache := _getHelpCache(&ao)
+      expected_cache_help := "  --a? [A?], --AA? [A?] help"
       tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
     }
   }

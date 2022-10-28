@@ -404,8 +404,8 @@ _getHelpCache :: proc(
     append(&opt_vars, self.flags[0])
   } else {
     for flag, idx in self.flags {
-      var := _makeUsageString(self = self, flag = flag, disable_keyword_brackets = true, prefix = prefix, allocator = context.temp_allocator)
-      append(&opt_vars, fmt.tprintf("%v%v", flag, vars))
+      tmp_usage := _makeUsageString(self = self, flag = flag, disable_keyword_brackets = true, prefix = prefix, allocator = context.temp_allocator)
+      append(&opt_vars, tmp_usage)
     }
   }
   all_opt_vars := join(opt_vars[:], ", ")
