@@ -249,59 +249,61 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
     found_values := trie.getAllValuesWithPrefix(&self._option_trie, arg)
     found_arg_idx := -1
     switch len(found_values) {
-      case 0:
-        log.debugf("Unknown argument:\"%v\"",arg)
-        append(& unknown_args, arg)
-        ok = false
-      case 1:
-        found_arg_idx = found_values[0]
-      case >1:
-        append(& unknown_args, arg)
-        {
-          ambiguous_args := make([dynamic]string)
-          append(&line, "Ambiguous arguments:[")
-          for found_idx, idx in found_values {
-            if found_idx <0 || found_idx>=len(self.options) {
-              log.warnf("Found invalid index. Skipping")
-              continue
-            }
-            option := &self.options[found_idx]
-            for flag in option.flags {
-              if len(ambiguous_args)==0 {
-                append(&ambiguous_args, fmt.tprintf("\"%v\"", flag))
-              } else {
-                append(&ambiguous_args, fmt.tprintf(", \"%v\"", flag))
-              }
+    case 0:
+      log.debugf("Unknown argument:\"%v\"", arg)
+      append(&unknown_args, arg)
+      ok = false
+    case 1:
+      found_arg_idx = found_values[0]
+    case:
+      // TODO re-address bounds here....
+      append(&unknown_args, arg)
+      {
+        ambiguous_args := make([dynamic]string)
+        append(&line, "Ambiguous arguments:[")
+        for found_idx, idx in found_values {
+          if found_idx < 0 || found_idx >= len(self.options) {
+            log.warnf("Found invalid index. Skipping")
+            continue
+          }
+          option := &self.options[found_idx]
+          for flag in option.flags {
+            if len(ambiguous_args) == 0 {
+              append(&ambiguous_args, fmt.tprintf("\"%v\"", flag))
+            } else {
+              append(&ambiguous_args, fmt.tprintf(", \"%v\"", flag))
             }
           }
-          log.errorf("Found amgiguous arguments for arg:\"%v\". Options:%v", arg, ambiguous_args)
         }
-        ok = false
-      case:
-        log.errorf("Invalid arg:\"%v\"", arg)
-        append(& unknown_args, arg)
-        ok = false
+        log.errorf("Found amgiguous arguments for arg:\"%v\". Options:%v", arg, ambiguous_args)
+      }
+      ok = false
+    case:
+      log.errorf("Invalid arg:\"%v\"", arg)
+      append(&unknown_args, arg)
+      ok = false
     }
-    if found_arg_idx<0 || found_arg_idx>=len(self.options) {
+    if found_arg_idx < 0 || found_arg_idx >= len(self.options) {
       log.warnf("Found invalid index. Skipping")
       ok = false
       continue
     }
     option := &self.options[found_arg_idx]
     switch option.action {
-      case .StoreTrue:
-        out[option.dest] = true
-      case .StoreFalse:
-        out[option.dest] = false
-      case .StoreConst:
-        out[option.dest] = "const" // TODO: option.constant_value
-      case .Help:
-        fmt.print(getHelp(self))
-        ok = false
-        break arg_loop
-      case .Version:
-        // TODO
-      case .Store
+    case .StoreTrue:
+      out[option.dest] = true
+    case .StoreFalse:
+      out[option.dest] = false
+    case .StoreConst:
+      out[option.dest] = "const" // TODO: option.constant_value
+    case .Help:
+      fmt.print(getHelp(self))
+      ok = false
+      break arg_loop
+    case .Version:
+    // TODO
+    case .Store:
+    // TODO
     }
   }
   if !ok {

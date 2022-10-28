@@ -29,3 +29,30 @@ ArgumentAction :: enum {
   Extend,
   // This stores a list, and extends each argument value to the list. Example usage:
 }
+
+isArgumentActionComposed :: proc(action: ArgumentAction) -> bool {
+  switch action {
+  case .Store:
+    fallthrough
+  case .StoreConst:
+    fallthrough
+  case .StoreTrue:
+    fallthrough
+  case .StoreFalse:
+    fallthrough
+  case .Help:
+    return false
+  ///////////////////
+  case .Append:
+    fallthrough
+  case .AppendConst:
+    fallthrough
+  case .Count:
+    fallthrough
+  case .Version:
+    fallthrough
+  case .Extend:
+    return true
+  }
+  return false
+}

@@ -10,7 +10,18 @@ import "core:unicode/utf8"
 
 import "game:trie"
 
-ArgumentOptionType :: enum {
+NumTokens :: struct {
+  lower: int,
+  upper: Maybe(int),
+}
+
+NargsType :: union {
+  int,
+  rune,
+  string,
+}
+
+ArgumentFlagType :: enum {
   Invalid,
   Short,
   Long,
@@ -20,7 +31,6 @@ ArgumentOptionType :: enum {
 ArgumentOption :: struct {
   flags:          []string,
   dest:           string,
-  nargs:          int,
   constant_value: any,
   default:        any,
   // type
@@ -28,10 +38,33 @@ ArgumentOption :: struct {
   action:         ArgumentAction,
   required:       bool,
   help:           string,
+  /*
+  // In header: <boost/program_flags/value_semantic.hpp>
+
+
+class value_semantic {
+public:
+  // construct/copy/destruct
+  ~value_semantic();
+
+  // public member functions
+  virtual std::string name() const = 0;
+  virtual unsigned min_tokens() const = 0;
+  virtual unsigned max_tokens() const = 0;
+  virtual bool is_composing() const = 0;
+  virtual bool is_required() const = 0;
+  virtual void 
+  parse(boost::any &, const std::vector< std::string > &, bool) const = 0;
+  virtual bool apply_default(boost::any &) const = 0;
+  virtual void notify(const boost::any &) const = 0;
+};
+  */
   _allocator:     runtime.Allocator,
   _is_positional: bool,
+  _is_composed:   bool, // multipart
   _cache_usage:   Maybe(string),
   _cache_help:    Maybe(string),
+  nargs:          int,
 }
 
 @(require_results)
@@ -48,7 +81,7 @@ makeArgumentOption :: proc(
   out: ArgumentOption,
   ok: bool,
 ) {
-  ok = _areOptionStringsOkay(flags, prefix)
+  ok = _areFlagsOkay(flags, prefix)
   if !ok {
     return
   }
@@ -99,7 +132,7 @@ makeArgumentOption :: proc(
   if dest_string, mdest_ok := dest.?; mdest_ok {
     out.dest = dest_string
   } else {
-    out.dest, ok = _getDestFromOptions(out.flags, prefix)
+    out.dest, ok = _getDestFromFlags(out.flags, prefix)
     if !ok {
       deleteArgumentOption(&out)
       return
@@ -108,7 +141,8 @@ makeArgumentOption :: proc(
   if shelp, ok := help.?; ok {
     out.help = strings.clone(shelp, allocator)
   }
-  out._is_positional = _isPositionalOption(out.flags[0])
+  out._is_composed = isArgumentActionComposed(out.action)
+  out._is_positional = _isPositionalFlag(out.flags[0])
   if out._is_positional {
     if out.nargs <= 0 {
       log.errorf("Argument is positional, but nargs is invalid. Expected >0. Got:%v", out.nargs)
@@ -156,7 +190,7 @@ makeArgumentOption :: proc(
 }
 
 deleteArgumentOption :: proc(self: $T/^ArgumentOption) {
-  if self == nil {
+  if self == {} {
     return
   }
   for _, idx in self.flags {
@@ -170,71 +204,75 @@ deleteArgumentOption :: proc(self: $T/^ArgumentOption) {
   self.help = {}
   if usage, ok := self._cache_usage.?; ok {
     delete(usage, self._allocator)
-    self._cache_usage = nil
+    self._cache_usage = {}
+  }
+  if help, ok := self._cache_help.?; ok {
+    delete(help, self._allocator)
+    self._cache_help = {}
   }
 }
 
 /////////////////////////////
 
-_isPositionalOption :: proc(option: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
+_isPositionalFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
   using utf8
-  r0 := rune_at_pos(option, 0)
+  r0 := rune_at_pos(flag, 0)
   out := ((r0 != prefix && r0 != RUNE_ERROR))
   return out
 }
 
-_isShortOption :: proc(option: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
+_isShortFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
   using utf8
-  r0 := rune_at_pos(option, 0)
-  r1 := rune_at_pos(option, 1)
-  r2 := rune_at_pos(option, 2)
+  r0 := rune_at_pos(flag, 0)
+  r1 := rune_at_pos(flag, 1)
+  r2 := rune_at_pos(flag, 2)
   out := ((r0 == prefix) && (r1 != prefix && r1 != RUNE_ERROR) && (r2 == RUNE_ERROR))
   return out
 }
 
-_isLongOption :: proc(option: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
+_isLongFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
   using utf8
-  r0 := rune_at_pos(option, 0)
-  r1 := rune_at_pos(option, 1)
-  r2 := rune_at_pos(option, 2)
+  r0 := rune_at_pos(flag, 0)
+  r1 := rune_at_pos(flag, 1)
+  r2 := rune_at_pos(flag, 2)
   out := ((r0 == prefix) && ((r1 == prefix) && (r2 != prefix && r2 != RUNE_ERROR)) || ((r1 != prefix) && (r2 == prefix && r2 != RUNE_ERROR)))
   return out
 }
 
-_getOptionType :: proc(option: string, prefix := _DEFAULT_PREFIX_RUNE) -> ArgumentOptionType {
-  if _isShortOption(option, prefix) {
+_getFlagType :: proc(flag: string, prefix := _DEFAULT_PREFIX_RUNE) -> ArgumentFlagType {
+  if _isShortFlag(flag, prefix) {
     return .Short
-  } else if _isLongOption(option, prefix) {
+  } else if _isLongFlag(flag, prefix) {
     return .Long
-  } else if _isPositionalOption(option, prefix) {
+  } else if _isPositionalFlag(flag, prefix) {
     return .Positional
   }
   return .Invalid
 }
 
-_areOptionStringsOkay :: proc(options: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
-  if len(options) <= 0 {
-    log.errorf("Expected at least one option.")
+_areFlagsOkay :: proc(flags: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
+  if len(flags) <= 0 {
+    log.errorf("Expected at least one flag.")
     return false
   }
   has_positional := false
   has_short_or_long := false
   ok := true
-  for option, idx in options {
-    opt_type := _getOptionType(option, prefix)
+  for flag, idx in flags {
+    opt_type := _getFlagType(flag, prefix)
     switch opt_type {
     case .Invalid:
-      log.errorf("Invalid option that is neither short, long, nor position option. options[%v]:\"%v\"", idx, option)
+      log.errorf("Invalid flag that is neither short, long, nor position flag. flags[%v]:\"%v\"", idx, flag)
       ok = false
     case .Positional:
       if has_short_or_long {
-        log.errorf("Cannot mix positional and keyword options in a single argument. options[%v]:\"%v\"", idx, option)
+        log.errorf("Cannot mix positional and keyword flags in a single argument. flags[%v]:\"%v\"", idx, flag)
         ok = false
       } else if !has_positional {
         has_positional = true
         break
       } else {
-        log.errorf("Only a single positional option is allowed. options[%v]:\"%\"", idx, option)
+        log.errorf("Only a single positional flag is allowed. flags[%v]:\"%\"", idx, flag)
         ok = false
       }
       fallthrough
@@ -243,7 +281,7 @@ _areOptionStringsOkay :: proc(options: []string, prefix := _DEFAULT_PREFIX_RUNE)
     case .Long:
       has_short_or_long = true
       if has_positional {
-        log.errorf("Cannot mix positional and keyword options in a single argument. options[%v]:\"%v\"", idx, option)
+        log.errorf("Cannot mix positional and keyword flags in a single argument. flags[%v]:\"%v\"", idx, flag)
         ok = false
       }
     }
@@ -281,42 +319,42 @@ _replaceRunes :: proc(s: string, old_runes: []rune, replacement: $R, allocator :
 /////////////////////////////
 
 @(require_results)
-_getDestFromOptions :: proc(options: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> (out: string, ok: bool) {
-  // Assumes that options is non-empty
+_getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> (out: string, ok: bool) {
+  // Assumes that flags is non-empty
   out = ""
   ok = false
-  if len(options) <= 0 {
-    log.errorf("Option strings is empty. Expected at least one option string.")
+  if len(flags) <= 0 {
+    log.errorf("Option strings is empty. Expected at least one flag string.")
     return
   }
-  long_option_index := -1
-  for option, idx in options {
-    if _isLongOption(option, prefix) {
-      long_option_index = idx
+  long_flag_index := -1
+  for flag, idx in flags {
+    if _isLongFlag(flag, prefix) {
+      long_flag_index = idx
       break
     }
   }
-  option_index := long_option_index >= 0 ? long_option_index : 0
-  option := options[option_index]
+  flag_index := long_flag_index >= 0 ? long_flag_index : 0
+  flag := flags[flag_index]
   first_non_prefix_index := -1
-  for rn, idx in option {
+  for rn, idx in flag {
     if rn != prefix {
       first_non_prefix_index = idx
       break
     }
   }
   if first_non_prefix_index == -1 {
-    log.errorf("Could not determine first non-prefix index in option:\"%v\"", option)
+    log.errorf("Could not determine first non-prefix index in flag:\"%v\"", flag)
     return
   }
-  option = option[first_non_prefix_index:]
+  flag = flag[first_non_prefix_index:]
   // Now replace every [^a-zA-Z_] with "_"
   pieces := make([dynamic]string, context.temp_allocator)
   start_idx := 0
-  for rn, idx in option {
+  for rn, idx in flag {
     val := int(rn)
     if (48 <= val && val < 58) || (65 <= val && val < 91) || (97 <= val && val < 123) {
-      append(&pieces, option[idx:idx + 1])
+      append(&pieces, flag[idx:idx + 1])
     } else {
       append(&pieces, "_")
     }
@@ -334,12 +372,12 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
     return usage
   }
   context.allocator = self._allocator
-  option0 := len(self.flags) > 0 ? self.flags[0] : ""
+  flag0 := len(self.flags) > 0 ? self.flags[0] : ""
   out: string = ""
   if self._is_positional {
     pieces := make([dynamic]string, self.nargs)
     for idx in 0 ..< self.nargs {
-      pieces[idx] = option0
+      pieces[idx] = flag0
     }
     out = join(pieces[:], " ", self._allocator)
   } else {
@@ -347,7 +385,7 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
     if !self.required {
       append(&line, "[")
     }
-    append(&line, option0)
+    append(&line, flag0)
     if self.nargs > 0 {
       opt_u := fmt.tprintf(" %v", strings.to_upper(self.dest))
       append(&line, strings.repeat(opt_u, self.nargs))
@@ -361,7 +399,7 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
   return out
 }
 
-_getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_width: int = 22, allocator := context.allocator) -> string {
+_getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width: int = 22, allocator := context.allocator) -> string {
   if help_cache, ok := self._cache_help.?; ok {
     return help_cache
   }
@@ -373,8 +411,8 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_wid
     vars = repeat(dest_u, self.nargs)
   }
   opt_vars := make([dynamic]string)
-  for option, idx in self.flags {
-    append(&opt_vars, fmt.tprintf("%v%v", option, vars))
+  for flag, idx in self.flags {
+    append(&opt_vars, fmt.tprintf("%v%v", flag, vars))
   }
   all_opt_vars := join(opt_vars[:], ", ")
   first_line_pieces := make([dynamic]string)
@@ -382,16 +420,16 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_wid
 
   help_lines := split(self.help, "\n")
   help_start_index := 0
-  if len(all_opt_vars) <= option_field_width {
+  if len(all_opt_vars) <= flag_field_width {
     // add first help line to opt vars line
-    append(&first_line_pieces, repeat(" ", option_field_width - len(all_opt_vars)))
+    append(&first_line_pieces, repeat(" ", flag_field_width - len(all_opt_vars)))
     append(&first_line_pieces, help_lines[0])
     help_start_index += 1
   }
 
   out_lines := make([dynamic]string)
   append(&out_lines, concatenate({indent, join(first_line_pieces[:], "")}))
-  help_indent := repeat(" ", option_field_width)
+  help_indent := repeat(" ", flag_field_width)
   for idx in help_start_index ..< len(help_lines) {
     append(&out_lines, concatenate({indent, help_indent, help_lines[idx]}))
   }
@@ -399,4 +437,83 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_wid
   out := join(out_lines[:], "\n", self._allocator)
   self._cache_help = out
   return out
+}
+
+/////////////////////////////////////////////////////////
+
+_parseNargs :: proc(action: ArgumentAction, mnargs: Maybe(NargsType)) -> (out: NumTokens, ok: bool) {
+  out = NumTokens{}
+  ok = true
+  if vnargs, vnarg_ok := mnargs.?; vnarg_ok {
+    switch nargs in vnargs {
+    case int:
+      if nargs < 0 {
+        log.errorf("If nargs is an int, it must be >=0. Got:%v", nargs)
+        ok = false
+      } else {
+        out.lower = nargs
+        out.upper = nargs
+      }
+    case string:
+      switch nargs {
+      case "?":
+        out.lower = 0
+        out.upper = 1
+      case "*":
+        out.lower = 0
+        out.upper = {}
+      case "+":
+        out.lower = 1
+        out.upper = {}
+      case:
+        log.errorf("If nargs is a string, it must be in the set {\"?\",\"*\",\"+\"}. Got:\"%v\"", nargs)
+        ok = false
+      }
+    case rune:
+      switch nargs {
+      case '?':
+        out.lower = 0
+        out.upper = 1
+      case '*':
+        out.lower = 0
+        out.upper = {}
+      case '+':
+        out.lower = 1
+        out.upper = {}
+      case:
+        log.errorf("If nargs is a rune, it must be in the set {'?','*','+'}. Got:'%v'", nargs)
+        ok = false
+      }
+    }
+    return
+  }
+  // use default 
+  switch action {
+  case .StoreTrue:
+    fallthrough
+  case .StoreFalse:
+    fallthrough
+  case .StoreConst:
+    fallthrough
+  case .AppendConst:
+    fallthrough
+  case .Count:
+    fallthrough
+  case .Help:
+    fallthrough
+  case .Version:
+    out.lower = 0
+    out.upper = 0
+  ///////////////
+  case .Append:
+    out.lower = 0
+    out.upper = 1
+  case .Extend:
+    out.lower = 0
+    out.upper = {}
+  case .Store:
+    out.lower = 1
+    out.upper = 1
+  }
+  return
 }
