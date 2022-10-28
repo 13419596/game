@@ -3,7 +3,7 @@ ODIN=$(shell which odin)
 PYTHON=$(shell which python3)
 COLLECTIONS=-collection:tests=./ -collection:game=../src
 
-all: generate_test_assets test_util test_regex test_container_set test_gmath test_gstrconv
+all: generate_test_assets test_util test_container_set test_gmath test_gstrconv test_trie test_argparse
 
 generate_test_assets:
 	$(PYTHON) -m pip install numpy
@@ -16,9 +16,9 @@ test_util:
 # No test format, odin is still broken
 # test_fmt:
 # 	$(ODIN) run fmt/ $(COLLECTIONS)
-
-test_regex:
-	$(ODIN) run regex/ $(COLLECTIONS)
+#
+# test_regex:
+# 	$(ODIN) run regex/ $(COLLECTIONS)
 
 test_container_set:
 	$(ODIN) run container/set/ $(COLLECTIONS)
@@ -28,4 +28,10 @@ test_gmath:
 
 test_gstrconv:
 	$(ODIN) run gstrconv/ $(COLLECTIONS)
+
+test_trie:
+	$(ODIN) run trie/ $(COLLECTIONS)
+
+test_argparse:
+	$(ODIN) run argparse/ $(COLLECTIONS)
 
