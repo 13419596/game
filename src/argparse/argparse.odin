@@ -121,17 +121,34 @@ addArgument :: proc(
     allocator = self._allocator,
   )
   if !arg_ok {
-    // no de-alloc is necessary in this case, nothing should have been allocated
+    deleteArgumentOption(&arg_option)
     return false
   }
-  if trie.containsKey(&self._option_trie, arg_option.dest) {
-    log.errorf("Conflicting option \"%v\"", arg_option.dest)
-    // no de-alloc is necessary in this case, nothing should have been allocated
+  ok := true
+  for flag, flag_idx in arg_option.flags {
+    found_value, found_ok := trie.getValue(&self._option_trie, flag)
+    if !found_ok {
+      continue
+    }
+    if found_value < 0 || found_value >= len(self.options) {
+      log.errorf("Found conflicting value that corresponds to invalid index:%v.", found_value)
+      ok = false
+      break
+    }
+    conflicting_option := &self.options[found_value]
+    log.errorf("New option flag:\"%v\" conflicts with existing option flags:%v", flag, conflicting_option.flags)
+    ok = false
+    break
+  }
+  if !ok {
+    deleteArgumentOption(&arg_option)
     return false
   }
   new_index := len(self.options)
-  trie.setItem(&self._option_trie, arg_option.dest, new_index)
   append(&self.options, arg_option)
+  for flag in arg_option.flags {
+    trie.setValue(&self._option_trie, flag, new_index)
+  }
   return true
 }
 
