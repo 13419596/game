@@ -33,7 +33,7 @@ randomSetInt :: proc(N: Maybe(int) = nil, scale: f64 = 10.) -> container_set.Set
   N := N.(int) or_else int(abs(exp_float64() * scale))
   out := container_set.makeSet(int)
   for n in 0 ..< N {
-    out.set[n] = nil
+    out.set[n] = {}
   }
   return out
 }

@@ -84,7 +84,7 @@ test_asArray :: proc(t: ^testing.T) {
     set := makeSet(int)
     defer deleteSet(&set)
     for i in 0 ..< n {
-      set.set[i] = nil
+      set.set[i] = {}
     }
     arr := asArray(&set)
     defer delete(arr)
@@ -136,7 +136,7 @@ test_size :: proc(t: ^testing.T) {
     defer deleteSet(&set)
     for i in 0 ..< n {
       tc.expect(t, size(&set) == i, "set length should equal i")
-      set.set[i] = nil
+      set.set[i] = {}
       tc.expect(t, size(&set) == i + 1, "set length should equal i")
     }
     tc.expect(t, size(&set) == n, "set length should equal n")

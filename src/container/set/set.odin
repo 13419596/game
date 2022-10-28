@@ -658,7 +658,7 @@ intersection_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T), allocato
   items_to_delete := makeSet(T = T, allocator = context.temp_allocator)
   for item, _ in self.set {
     if !(item in other.set) {
-      items_to_delete.set[item] = nil // add item
+      items_to_delete.set[item] = {} // add item
     }
   }
   for item, _ in items_to_delete.set {
@@ -883,7 +883,7 @@ symmetric_difference_update_set :: proc(self: ^$S1/Set($T), other: ^$S2/Set(T)) 
   inter := intersection(self, other, context.temp_allocator)
   for item, _ in other.set {
     if !(item in inter.set) {
-      self.set[item] = nil // add item
+      self.set[item] = {} // add item
     }
   }
   for item, _ in inter.set {
