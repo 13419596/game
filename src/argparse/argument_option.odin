@@ -31,7 +31,7 @@ ArgumentOption :: struct {
   _allocator:     runtime.Allocator,
   _is_positional: bool,
   _cache_usage:   Maybe(string),
-  _help_cache:    Maybe(string),
+  _cache_help:    Maybe(string),
 }
 
 @(require_results)
@@ -362,7 +362,7 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
 }
 
 _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_width: int = 22, allocator := context.allocator) -> string {
-  if help_cache, ok := self._help_cache.?; ok {
+  if help_cache, ok := self._cache_help.?; ok {
     return help_cache
   }
   using strings
@@ -397,6 +397,6 @@ _getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", option_field_wid
   }
 
   out := join(out_lines[:], "\n", self._allocator)
-  self._help_cache = out
+  self._cache_help = out
   return out
 }

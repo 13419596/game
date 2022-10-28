@@ -270,8 +270,8 @@ test_getHelpCache :: proc(t: ^testing.T) {
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
-      expected_help_cache := "  -l L                  0123456789\n                        0123456789"
-      tc.expect(t, expected_help_cache == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_help_cache, help_cache))
+      expected_cache_help := "  -l L                  0123456789\n                        0123456789"
+      tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
     }
     {
       ao, ok := makeArgumentOption(
@@ -285,16 +285,16 @@ test_getHelpCache :: proc(t: ^testing.T) {
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
-      expected_help_cache := "  -l LONG LONG LONG LONG LONG LONG LONG LONG LONG LONG, --long LONG LONG LONG LONG LONG LONG LONG LONG LONG LONG\n                        0123456789\n                        0123456789"
-      tc.expect(t, expected_help_cache == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_help_cache, help_cache))
+      expected_cache_help := "  -l LONG LONG LONG LONG LONG LONG LONG LONG LONG LONG, --long LONG LONG LONG LONG LONG LONG LONG LONG LONG LONG\n                        0123456789\n                        0123456789"
+      tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
     }
     {
       ao, ok := makeArgumentOption(flags = []string{"pos"}, action = ArgumentAction.Store, required = true, help = "help", allocator = alloc, nargs = 3)
       defer deleteArgumentOption(&ao)
       tc.expect(t, ok)
       help_cache := _getHelpCache(&ao)
-      expected_help_cache := "  pos                   help"
-      tc.expect(t, expected_help_cache == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_help_cache, help_cache))
+      expected_cache_help := "  pos                   help"
+      tc.expect(t, expected_cache_help == help_cache, fmt.tprintf("\nExpected:\"\"\"\n%v\n\"\"\".\nGot:\"\"\"\n%v\n\"\"\"", expected_cache_help, help_cache))
     }
   }
 }
