@@ -1,13 +1,7 @@
 package argparse
 
-import "core:fmt"
 import "core:log"
-import "core:os"
-import "core:runtime"
 import "core:strings"
-import "core:path/filepath"
-
-import "game:trie"
 
 
 _ArgumentFlagType :: enum {
@@ -84,6 +78,7 @@ _ShortFlagParts :: struct {
 }
 
 _getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> (out: _ShortFlagParts, ok: bool) #optional_ok {
+  // returns slices of arg, does not allocate
   out.arg = arg
   flag_start_idx := -1 // string slice index for start of flag
   // -a -> 1

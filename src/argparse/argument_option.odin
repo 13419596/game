@@ -2,13 +2,8 @@ package argparse
 
 import "core:fmt"
 import "core:log"
-import "core:os"
 import "core:runtime"
 import "core:strings"
-import "core:path/filepath"
-import "core:unicode/utf8"
-
-import "game:trie"
 
 ArgumentOption :: struct {
   flags:          []string,
