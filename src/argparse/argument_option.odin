@@ -143,7 +143,7 @@ _makeUsageString :: proc(
   allocator := context.allocator,
 ) -> string {
   using strings
-  context.allocator = allocator
+  context.allocator = context.temp_allocator
   out: string = ""
   if self._is_positional {
     pieces := make([dynamic]string)
@@ -164,7 +164,7 @@ _makeUsageString :: proc(
       append(&pieces, concatenate({"[", flag}))
       append(&pieces, "...]")
     }
-    out = join(pieces[:], " ")
+    out = join(pieces[:], " ", allocator)
   } else {
     line := make([dynamic]string)
     add_surrounding_brackets := (!self.required || (self.num_tokens.lower == 0 && self.num_tokens.upper == 0)) && !disable_keyword_brackets
@@ -193,7 +193,7 @@ _makeUsageString :: proc(
     if add_surrounding_brackets {
       append(&line, "]")
     }
-    out = strings.join(line[:], "")
+    out = strings.join(line[:], "", allocator)
   }
   return out
 }
@@ -208,13 +208,7 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
   return out
 }
 
-_getHelpCache :: proc(
-  self: $T/^ArgumentOption,
-  indent := "  ",
-  flag_field_width: int = 22,
-  prefix := _DEFAULT_PREFIX_RUNE,
-  allocator := context.allocator,
-) -> string {
+_getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width: int = 22, prefix := _DEFAULT_PREFIX_RUNE) -> string {
   if help_cache, ok := self._cache_help.?; ok {
     return help_cache
   }

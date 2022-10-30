@@ -124,6 +124,7 @@ _getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> (out:
 
 /////////////////////////////
 
+@(require_results)
 _cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> []string {
   // Cleans all flag prefixes
   context.allocator = allocator
@@ -136,6 +137,7 @@ _cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, al
 
 /////////////////////////////
 
+@(require_results)
 _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> (out: string, ok: bool) {
   // Gets first long flag, (if none, then short or pos) and strips prefix
   using strings
