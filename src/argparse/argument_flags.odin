@@ -125,9 +125,11 @@ _getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> (out:
 /////////////////////////////
 
 _cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> []string {
-  flags := make([dynamic]string, len(raw_flags), allocator)
+  // Cleans all flag prefixes
+  context.allocator = allocator
+  flags := make([dynamic]string, len(raw_flags))
   for raw_flag, idx in raw_flags {
-    flags[idx] = _normalizePrefix(s = raw_flag, old = []rune{prefix}, replacement = prefix, allocator = allocator)
+    flags[idx] = _normalizePrefix(s = raw_flag, old = []rune{prefix}, replacement = prefix)
   }
   return flags[:]
 }
