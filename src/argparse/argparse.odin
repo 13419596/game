@@ -10,7 +10,10 @@ import "core:unicode/utf8"
 import "game:trie"
 
 @(private)
-_DEFAULT_PREFIX_RUNE: rune = '-'
+_DEFAULT_PREFIX_RUNE: rune : '-'
+
+@(private = "file")
+_LONG_OPTION_SPLIT_RUNE: rune : '='
 
 ArgumentParser :: struct {
   prog:          string, // The name of the program (default: sys.argv[0])

@@ -1,14 +1,6 @@
 package argparse
 
-import "core:fmt"
 import "core:log"
-import "core:os"
-import "core:runtime"
-import "core:strings"
-import "core:path/filepath"
-import "core:unicode/utf8"
-
-import "game:trie"
 
 NargsType :: union {
   int,
@@ -145,6 +137,14 @@ _isKeywordOptionNumTokensValid :: proc(action: ArgumentAction, num_tokens: _NumT
 }
 
 _isOptionNumTokensValid :: proc(is_positional: bool, action: ArgumentAction, num_tokens: _NumTokens) -> bool {
+  if num_tokens.lower < 0 {
+    // lower cannot be negative
+    return false
+  }
+  if upper, upper_ok := num_tokens.upper.?; upper_ok && num_tokens.lower > upper {
+    // lower cannot be greater than upper
+    return false
+  }
   if is_positional {
     return _isPositionalOptionNumTokensValid(action, num_tokens)
   }

@@ -6,9 +6,9 @@ import "core:os"
 import "core:runtime"
 import "core:strings"
 import "core:path/filepath"
-import "core:unicode/utf8"
 
 import "game:trie"
+
 
 _ArgumentFlagType :: enum {
   Invalid,
@@ -20,27 +20,47 @@ _ArgumentFlagType :: enum {
 /////////////////////////////
 
 _isPositionalFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
-  using utf8
-  r0 := rune_at_pos(flag, 0)
-  out := ((r0 != prefix && r0 != RUNE_ERROR))
-  return out
+  rn_idx := 0
+  for rn in flag {
+    return rn != prefix
+  }
+  return false
 }
 
 _isShortFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
-  using utf8
-  r0 := rune_at_pos(flag, 0)
-  r1 := rune_at_pos(flag, 1)
-  out := ((r0 == prefix) && (r1 != prefix && r1 != RUNE_ERROR))
-  return out
+  rn_idx := 0
+  for rn in flag {
+    switch rn_idx {
+    case 0:
+      if rn != prefix {
+        return false
+      }
+    case 1:
+      return rn != prefix
+    }
+    rn_idx += 1
+  }
+  return false
 }
 
 _isLongFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
-  using utf8
-  r0 := rune_at_pos(flag, 0)
-  r1 := rune_at_pos(flag, 1)
-  r2 := rune_at_pos(flag, 2)
-  out := ((r0 == prefix) && (r1 == prefix) && (r2 != prefix && r2 != RUNE_ERROR))
-  return out
+  rn_idx := 0
+  for rn in flag {
+    switch rn_idx {
+    case 0:
+      if rn != prefix {
+        return false
+      }
+    case 1:
+      if rn != prefix {
+        return false
+      }
+    case 2:
+      return rn != prefix
+    }
+    rn_idx += 1
+  }
+  return false
 }
 
 _getFlagType :: proc(flag: string, prefix := _DEFAULT_PREFIX_RUNE) -> _ArgumentFlagType {
@@ -57,24 +77,49 @@ _getFlagType :: proc(flag: string, prefix := _DEFAULT_PREFIX_RUNE) -> _ArgumentF
 /////////////////////////////
 
 _ShortFlagParts :: struct {
-  arg:      string,
-  prefix:   rune,
-  flag:     string,
-  trailing: string,
+  arg:                 string,
+  flag_without_prefix: string,
+  flag_with_prefix:    string,
+  tail:                string,
 }
 
-_getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> _ShortFlagParts {
-  using utf8
-  r0 := rune_at_pos(arg, 0)
-  r1 := rune_at_pos(arg, 1)
-  idx := rune_size(r0) + rune_size(r1)
-  out := _ShortFlagParts {
-    arg      = arg,
-    prefix   = r0,
-    flag     = arg[:idx],
-    trailing = arg[idx:],
+_getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> (out: _ShortFlagParts, ok: bool) #optional_ok {
+  out.arg = arg
+  flag_start_idx := -1 // string slice index for start of flag
+  // -a -> 1
+  // -äb -> 1
+  tail_start_idx := -1 // string slice index for start of trail e.g. -ab -> 2  
+  // -a -> 2
+  // -äb -> 3
+  rn_idx := 0 // rune count index
+  loop: for rn, idx in arg {
+    switch rn_idx {
+    case 0:
+      if rn != prefix {
+        //invalid
+        ok = false
+        break loop
+      }
+    case 1:
+      if rn == prefix {
+        // invalid
+        ok = false
+        break loop
+      }
+      flag_start_idx = idx
+    case 2:
+      tail_start_idx = idx
+      ok = true
+      break loop
+    }
+    rn_idx += 1
   }
-  return out
+  if ok {
+    out.flag_with_prefix = arg[:tail_start_idx]
+    out.flag_without_prefix = arg[flag_start_idx:tail_start_idx]
+    out.tail = arg[tail_start_idx:]
+  }
+  return
 }
 
 /////////////////////////////
@@ -82,7 +127,7 @@ _getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> _Shor
 _cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> []string {
   flags := make([dynamic]string, len(raw_flags), allocator)
   for raw_flag, idx in raw_flags {
-    flags[idx] = _replaceRunes(raw_flag, {prefix}, prefix, allocator)
+    flags[idx] = _normalizePrefix(s = raw_flag, old = []rune{prefix}, replacement = prefix, allocator = allocator)
   }
   return flags[:]
 }
@@ -90,7 +135,7 @@ _cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, al
 /////////////////////////////
 
 _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> (out: string, ok: bool) {
-  // Gets first long flag and strips prefix
+  // Gets first long flag, (if none, then short or pos) and strips prefix
   using strings
   out = ""
   ok = false
@@ -126,6 +171,11 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) 
 /////////////////////////////
 
 _areFlagsOkay :: proc(flags: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
+  // Checks that
+  // - flags list is non-empty
+  // - only one positional
+  // - positional doesn't mix with keyword
+  // - no-invalid flags eg. '--'
   if len(flags) <= 0 {
     log.errorf("Expected at least one flag.")
     return false

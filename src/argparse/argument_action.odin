@@ -1,13 +1,5 @@
 package argparse
 
-import "core:os"
-import "core:runtime"
-import "core:strings"
-import "core:path/filepath"
-
-import "game:trie"
-
-
 ArgumentAction :: enum {
   Store,
   // This just stores the argument’s value. This is the default action. For example:

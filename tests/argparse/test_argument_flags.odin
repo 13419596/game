@@ -108,23 +108,23 @@ test_getShortFlagParts :: proc(t: ^testing.T) {
   {
     input := "-ab"
     expected := _ShortFlagParts {
-      arg      = input,
-      prefix   = '-',
-      flag     = "-a",
-      trailing = "b",
+      arg                 = input,
+      flag_with_prefix    = "-a",
+      flag_without_prefix = "a",
+      tail                = "b",
     }
     output := _getShortFlagParts(input, '-')
-    tc.expect(t, expected == output, fmt.tprintf("Expected:%v Got:%v", expected, output))
+    tc.expect(t, expected == output, fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
   }
   {
     input := "-ä0123456789"
     expected := _ShortFlagParts {
-      arg      = input,
-      prefix   = '-',
-      flag     = "-ä",
-      trailing = "0123456789",
+      arg                 = input,
+      flag_with_prefix    = "-ä",
+      flag_without_prefix = "ä",
+      tail                = "0123456789",
     }
     output := _getShortFlagParts(input, '-')
-    tc.expect(t, expected == output, fmt.tprintf("Expected:%v Got:%v", expected, output))
+    tc.expect(t, expected == output, fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
   }
 }
