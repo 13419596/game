@@ -216,13 +216,13 @@ _deleteOptionProcessingState :: proc(self: ^_OptionProcessingState) {
 
 ProcessOutput :: struct {
   num_consumed: int,
-  trailing:     Maybe(string),
+  trailer:      Maybe(string),
 }
 
 _processKeywordOption :: proc(
   option: $T/^ArgumentOption,
   state: $S/^_OptionProcessingState,
-  trailing: Maybe(string),
+  trailer: Maybe(string),
   args: []string,
 ) -> (
   out: ProcessOutput,
@@ -233,7 +233,7 @@ _processKeywordOption :: proc(
     log.errorf("Expected processing state to be not nil.")
     return
   }
-  out.trailing = trailing
+  out.trailer = trailer
   out.num_consumed = 0
   switch option.action {
   case .Version:
@@ -268,9 +268,9 @@ _processKeywordOption :: proc(
   case .Append:
     if vals, vals_ok := &state.data.([dynamic]string); vals_ok {
       // append single
-      if trail, trail_ok := out.trailing.?; trail_ok {
+      if trail, trail_ok := out.trailer.?; trail_ok {
         append(vals, trail)
-        out.trailing = nil // consume trailer
+        out.trailer = nil // consume trailer
       } else if len(args) < 1 {
         log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)
         break
@@ -283,7 +283,7 @@ _processKeywordOption :: proc(
     }
     if vvals, vvals_ok := &state.data.([dynamic][]string); vvals_ok {
       // append list
-      if trail, trail_ok := out.trailing.?; trail_ok {
+      if trail, trail_ok := out.trailer.?; trail_ok {
         if upper, upper_ok := option.num_tokens.upper.?; upper_ok {
           need_consume := max(1, option.num_tokens.lower)
           if need_consume != 1 {
@@ -296,7 +296,7 @@ _processKeywordOption :: proc(
         new_list := make([dynamic]string, 1, state._allocator)
         new_list[0] = trail
         append(vvals, new_list[:])
-        out.trailing = nil // consume trailer
+        out.trailer = nil // consume trailer
       } else {
         if len(args) < option.num_tokens.lower {
           log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)
@@ -313,9 +313,9 @@ _processKeywordOption :: proc(
     }
   case .Store:
     if s, s_ok := &state.data.(string); s_ok {
-      if trail, trail_ok := out.trailing.?; trail_ok {
+      if trail, trail_ok := out.trailer.?; trail_ok {
         s^ = trail
-        out.trailing = nil // consume trailer
+        out.trailer = nil // consume trailer
         ok = true
       } else if len(args) < 1 {
         log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)
@@ -335,7 +335,7 @@ _processKeywordOption :: proc(
     fallthrough
   case .Extend:
     if vals, vals_ok := &state.data.([dynamic]string); vals_ok {
-      if trail, trail_ok := out.trailing.?; trail_ok {
+      if trail, trail_ok := out.trailer.?; trail_ok {
         if upper, upper_ok := option.num_tokens.upper.?; upper_ok {
           need_consume := max(1, option.num_tokens.lower)
           if need_consume != 1 {
@@ -346,7 +346,7 @@ _processKeywordOption :: proc(
         }
         // unbounded is fine
         append(vals, trail)
-        out.trailing = nil // consume trailer
+        out.trailer = nil // consume trailer
       } else {
         if len(args) < option.num_tokens.lower {
           log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)
