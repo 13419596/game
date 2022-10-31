@@ -143,9 +143,7 @@ _makeOptionProcessingState :: proc(action: ArgumentAction, num_tokens: _NumToken
   context.allocator = allocator
   switch action {
   case .Version:
-    fallthrough
   case .Help:
-    fallthrough
   case .Count:
     out.data = int(0)
   case .StoreTrue:
