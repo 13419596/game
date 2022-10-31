@@ -210,6 +210,7 @@ _deleteOptionProcessingState :: proc(self: ^_OptionProcessingState) {
     }
     delete(data)
   }
+  self.data = nil
 }
 
 ProcessOutput :: struct {

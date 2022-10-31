@@ -13,6 +13,7 @@ import tc "tests:common"
 @(test)
 test_ArgParse_Keyword :: proc(t: ^testing.T) {
   test_determineKeywordOption(t)
+  test_makeOptionProcessingState(t)
   test_processKeywordOption(t)
 }
 
@@ -209,6 +210,24 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
     }
   }
 }
+
+@(test)
+test_makeOptionProcessingState :: proc(t: ^testing.T) {
+  using argparse
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  num_tokens := []_NumTokens{_NumTokens{}, _NumTokens{0, nil}, _NumTokens{1, nil}}
+  for alloc in allocs {
+    for nt in num_tokens {
+      for action in ArgumentAction {
+        state := _makeOptionProcessingState(action, nt, alloc)
+        _deleteOptionProcessingState(&state)
+        tc.expect(t, state.data == nil)
+      }
+    }
+  }
+}
+
+
 @(test)
 test_processKeywordOption :: proc(t: ^testing.T) {
   test_processKeywordOption_Store(t)
