@@ -220,6 +220,25 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
     for nt in num_tokens {
       for action in ArgumentAction {
         state := _makeOptionProcessingState(action, nt, alloc)
+        switch data in &state.data {
+        case bool:
+        case int:
+        case any:
+        case string:
+        case [dynamic]any:
+          append(&data, 3)
+        case [dynamic]string:
+          append(&data, "string data")
+          append(&data, "string data")
+          append(&data, "string data")
+        case [dynamic][]string:
+          vals := make([dynamic]string, 1)
+          vals[0] = "data"
+          append(&data, vals[:])
+          vals = make([dynamic]string, 1)
+          vals[0] = "data"
+          append(&data, vals[:])
+        }
         _deleteOptionProcessingState(&state)
         tc.expect(t, state.data == nil)
       }
