@@ -64,13 +64,13 @@ makeArgumentParser :: proc(
     out.prog = clone(filepath.base(os.args[0]), allocator)
   }
   if add_help {
-    option := addArgument(
+    option, opt_ok := addArgument(
       self = &out,
       flags = {fmt.tprintf("%vh", prefix_rune), fmt.tprintf("%v%vhelp", prefix_rune, prefix_rune)},
       action = .Help,
       help = "show this help message and exit",
     )
-    if option == nil {
+    if option == nil || !opt_ok {
       deleteArgumentParser(&out)
       ok = false
       return
@@ -116,7 +116,12 @@ addArgument :: proc(
   required := Maybe(bool){},
   dest := Maybe(string){},
   help := Maybe(string){},
-) -> ^ArgumentOption {
+) -> (
+  out: ^ArgumentOption,
+  ok: bool,
+) {
+  out = nil
+  ok = false
   option, arg_ok := makeArgumentOption(
     flags = flags,
     dest = dest,
@@ -129,9 +134,9 @@ addArgument :: proc(
   )
   if !arg_ok {
     deleteArgumentOption(&option)
-    return nil
+    return
   }
-  ok := true
+  ok = true
   if !option._is_positional {
     for flag, flag_idx in option.flags {
       found_value, found_ok := trie.getValue(&self._kw_trie, flag)
@@ -151,13 +156,15 @@ addArgument :: proc(
   }
   if !ok {
     deleteArgumentOption(&option)
-    return nil
+    return
   }
   self.options[option.dest] = option
   for flag in option.flags {
     trie.setValue(&self._kw_trie, flag, option.dest)
   }
-  return &self.options[option.dest]
+  out = &self.options[option.dest]
+  ok = true
+  return
 }
 
 ////////////////////////////////////////

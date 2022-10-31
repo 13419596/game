@@ -177,8 +177,7 @@ _makeOptionProcessingState :: proc(action: ArgumentAction, num_tokens: _NumToken
 }
 
 @(require_results)
-_makeOptionProcessingState_fromArgumentOption :: proc(option: $T/^ArgumentOption, allocator := context.allocator) -> (out: _OptionProcessingState, ok: bool)
-#optional_ok {
+_makeOptionProcessingState_fromArgumentOption :: proc(option: $T/^ArgumentOption, allocator := context.allocator) -> (out: _OptionProcessingState, ok: bool) {
   if option == nil {
     log.errorf("Unable to create processing state. option is nil")
     return
@@ -285,11 +284,15 @@ _processKeywordOption :: proc(
     if vvals, vvals_ok := &state.data.([dynamic][]string); vvals_ok {
       // append list
       if trail, trail_ok := out.trailing.?; trail_ok {
-        if option.num_tokens.lower != 1 {
-          // expected multiple arguments, but got a trailer, invalid
-          log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)
-          break
+        if upper, upper_ok := option.num_tokens.upper.?; upper_ok {
+          need_consume := max(1, option.num_tokens.lower)
+          if need_consume != 1 {
+            // expected multiple arguments, but got a trailer, invalid
+            log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, need_consume)
+            break
+          }
         }
+        // unbounded is fine
         new_list := make([dynamic]string, 1, state._allocator)
         new_list[0] = trail
         append(vvals, new_list[:])
@@ -333,13 +336,17 @@ _processKeywordOption :: proc(
   case .Extend:
     if vals, vals_ok := &state.data.([dynamic]string); vals_ok {
       if trail, trail_ok := out.trailing.?; trail_ok {
-        if option.num_tokens.lower != 1 {
-          // expected multiple arguments, but got a trailer, invalid
-          log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)
-          break
+        if upper, upper_ok := option.num_tokens.upper.?; upper_ok {
+          need_consume := max(1, option.num_tokens.lower)
+          if need_consume != 1 {
+            // expected multiple arguments, but got a trailer, invalid
+            log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, need_consume)
+            break
+          }
         }
+        // unbounded is fine
         append(vals, trail)
-        out.num_consumed = 1
+        out.trailing = nil // consume trailer
       } else {
         if len(args) < option.num_tokens.lower {
           log.errorf("Insufficient arguments for option:%q expected at least num %v arguments", option.dest, option.num_tokens.lower)

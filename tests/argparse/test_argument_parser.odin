@@ -45,31 +45,31 @@ test_addArgument :: proc(t: ^testing.T) {
       ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
       defer deleteArgumentParser(&ap)
       {
-        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok != nil)
+        arg, ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, ok)
       }
       {
         /// should conflict with previous
-        ok := addArgument(&ap, {"-v"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok == nil)
+        arg, ok := addArgument(&ap, {"-v"}, ArgumentAction.StoreTrue)
+        tc.expect(t, !ok)
       }
       {
         /// should conflict with previous
-        ok := addArgument(&ap, {"--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok == nil)
+        arg, ok := addArgument(&ap, {"--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, !ok)
       }
     }
     {
       // test again, but with temp_allocator
       ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
       {
-        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok != nil)
+        arg, ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, ok)
       }
       {
         /// should conflict with previous
-        ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok == nil)
+        arg, ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
+        tc.expect(t, !ok)
       }
     }
   }

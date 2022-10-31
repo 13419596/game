@@ -224,9 +224,10 @@ test_processKeywordOption_store :: proc(t: ^testing.T) {
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
-      option := addArgument(self = &ap, flags = {"--a"})
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"})
       tc.expect(t, option != nil)
-      proc_state := _makeOptionProcessingState_fromArgumentOption(option, alloc)
+      tc.expect(t, opt_ok)
+      proc_state, proc_state_ok := _makeOptionProcessingState_fromArgumentOption(option, alloc)
       defer _deleteOptionProcessingState(&proc_state)
       data_str, data_str_ok := &proc_state.data.(string)
       tc.expect(t, data_str_ok)
@@ -256,9 +257,9 @@ test_processKeywordOption_store :: proc(t: ^testing.T) {
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
-      option := addArgument(self = &ap, flags = {"--a"}, nargs = 2)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = 2)
       tc.expect(t, option != nil)
-      proc_state := _makeOptionProcessingState_fromArgumentOption(option, alloc)
+      proc_state, proc_state_ok := _makeOptionProcessingState_fromArgumentOption(option, alloc)
       defer _deleteOptionProcessingState(&proc_state)
       data_strs, data_ok := &proc_state.data.([dynamic]string)
       tc.expect(t, data_ok)
@@ -280,7 +281,141 @@ test_processKeywordOption_store :: proc(t: ^testing.T) {
         tc.expect(t, proc_out.trailing == nil)
         tc.expect(t, proc_out.num_consumed == 2)
         tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg0, input_arg1}))
+        // second confirms overwrite of state
         proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2, "extra", "extra33"})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 2)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2, input_arg2}))
+      }
+    }
+    {
+      // store, ?
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = "?")
+      tc.expect(t, option != nil)
+      tc.expect(t, opt_ok)
+      proc_state, proc_state_ok := _makeOptionProcessingState_fromArgumentOption(option, alloc)
+      defer _deleteOptionProcessingState(&proc_state)
+      data_strs, data_ok := &proc_state.data.([dynamic]string)
+      tc.expect(t, data_ok)
+      {
+        proc_out, ok := _processKeywordOption(option, &proc_state, {}, {})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{}))
+      }
+      {
+        input_trailer := "foo"
+        proc_out, ok := _processKeywordOption(option, &proc_state, input_trailer, {})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_trailer}))
+      }
+      {
+        input_arg0 := "bar0"
+        input_arg1 := "bar1"
+        input_arg2 := "2222"
+        proc_out, ok := _processKeywordOption(option, &proc_state, nil, {input_arg0, input_arg1, "extra", "extra33"})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 1)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg0}))
+        // second confirms overwrite of state
+        proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2, "extra", "extra33"})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 1)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2}))
+      }
+    }
+    {
+      // store, *
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = "*")
+      tc.expect(t, option != nil)
+      tc.expect(t, opt_ok)
+      proc_state, proc_state_ok := _makeOptionProcessingState_fromArgumentOption(option, alloc)
+      defer _deleteOptionProcessingState(&proc_state)
+      data_strs, data_ok := &proc_state.data.([dynamic]string)
+      tc.expect(t, data_ok)
+      {
+        proc_out, ok := _processKeywordOption(option, &proc_state, {}, {})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{}))
+      }
+      {
+        input_trailer := "foo"
+        proc_out, ok := _processKeywordOption(option, &proc_state, input_trailer, {input_trailer, input_trailer})
+        log.warnf("state:%v ;; out:%v ;; ok:%v", proc_state, proc_out, ok)
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_trailer}))
+      }
+      {
+        input_arg0 := "bar0"
+        input_arg1 := "bar1"
+        input_arg2 := "2222"
+        proc_out, ok := _processKeywordOption(option, &proc_state, nil, {input_arg0, input_arg1, input_arg2})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 3)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg0, input_arg1, input_arg2}))
+        // second confirms overwrite of state
+        proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 2)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2, input_arg2}))
+      }
+    }
+    {
+      // store, +
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = "+")
+      tc.expect(t, option != nil)
+      tc.expect(t, opt_ok)
+      proc_state, proc_state_ok := _makeOptionProcessingState_fromArgumentOption(option, alloc)
+      defer _deleteOptionProcessingState(&proc_state)
+      data_strs, data_ok := &proc_state.data.([dynamic]string)
+      tc.expect(t, data_ok)
+      {
+        proc_out, ok := _processKeywordOption(option, &proc_state, {}, {})
+        tc.expect(t, !ok, "Expected not okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+      }
+      {
+        input_trailer := "foo"
+        proc_out, ok := _processKeywordOption(option, &proc_state, input_trailer, {input_trailer, input_trailer})
+        log.warnf("state:%v ;; out:%v ;; ok:%v", proc_state, proc_out, ok)
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_trailer}))
+      }
+      {
+        input_arg0 := "bar0"
+        input_arg1 := "bar1"
+        input_arg2 := "2222"
+        proc_out, ok := _processKeywordOption(option, &proc_state, nil, {input_arg0, input_arg1, input_arg2})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailing == nil)
+        tc.expect(t, proc_out.num_consumed == 3)
+        tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg0, input_arg1, input_arg2}))
+        // second confirms overwrite of state
+        proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2})
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailing == nil)
         tc.expect(t, proc_out.num_consumed == 2)
