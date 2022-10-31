@@ -8,19 +8,6 @@ import "core:testing"
 import "game:argparse"
 import tc "tests:common"
 
-@(private = "file")
-isequal_slice :: proc(lhs, rhs: $T/[]$S) -> bool {
-  if len(lhs) != len(rhs) {
-    return false
-  }
-  for lv, idx in lhs {
-    if lv != rhs[idx] {
-      return false
-    }
-  }
-  return true
-}
-
 
 @(test)
 test_ArgumentOther :: proc(t: ^testing.T) {

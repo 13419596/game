@@ -46,17 +46,17 @@ test_addArgument :: proc(t: ^testing.T) {
       defer deleteArgumentParser(&ap)
       {
         ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok)
+        tc.expect(t, ok != nil)
       }
       {
         /// should conflict with previous
         ok := addArgument(&ap, {"-v"}, ArgumentAction.StoreTrue)
-        tc.expect(t, !ok)
+        tc.expect(t, ok == nil)
       }
       {
         /// should conflict with previous
         ok := addArgument(&ap, {"--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, !ok)
+        tc.expect(t, ok == nil)
       }
     }
     {
@@ -64,12 +64,12 @@ test_addArgument :: proc(t: ^testing.T) {
       ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
       {
         ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, ok)
+        tc.expect(t, ok != nil)
       }
       {
         /// should conflict with previous
         ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
-        tc.expect(t, !ok)
+        tc.expect(t, ok == nil)
       }
     }
   }

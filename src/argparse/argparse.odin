@@ -12,8 +12,11 @@ import "game:trie"
 @(private)
 _DEFAULT_PREFIX_RUNE: rune : '-'
 
-@(private = "file")
-_LONG_OPTION_SPLIT_RUNE: rune : '='
+@(private)
+_FLAG_EQUALITY_RUNE: rune : '='
+
+@(private)
+_TrieValueType :: string
 
 ArgumentParser :: struct {
   prog:          string, // The name of the program (default: sys.argv[0])
@@ -23,9 +26,9 @@ ArgumentParser :: struct {
   add_help:      bool, // Add a -h/-help option
   allow_abbrev:  bool, // Allow long options to be abbreviated unambiguously
   exit_on_error: bool,
-  options:       [dynamic]ArgumentOption,
+  options:       map[string]ArgumentOption,
   _allocator:    runtime.Allocator,
-  _option_trie:  trie.Trie(int, int), // int(rune) -> int option index
+  _kw_trie:      trie.Trie(int, _TrieValueType), // int(rune) -> int option index
   _cache_usage:  Maybe(string),
   _cache_help:   Maybe(string),
 }
@@ -51,24 +54,25 @@ makeArgumentParser :: proc(
     epilog = clone(epilog),
     prefix_rune = prefix_rune,
     allow_abbrev = allow_abbrev,
-    options = make([dynamic]ArgumentOption, allocator),
+    options = make(map[string]ArgumentOption, 0, allocator),
     _allocator = allocator,
-    _option_trie = trie.makeTrie(int, int, allocator),
+    _kw_trie = trie.makeTrie(int, _TrieValueType, allocator),
   }
-  if prog, ok := prog.(string); ok {
+  if prog, ok := prog.?; ok {
     out.prog = clone(prog, allocator)
   } else {
-    out.prog = clone(filepath.stem(os.args[0]), allocator)
+    out.prog = clone(filepath.base(os.args[0]), allocator)
   }
   if add_help {
-    ok = addArgument(
+    option := addArgument(
       self = &out,
       flags = {fmt.tprintf("%vh", prefix_rune), fmt.tprintf("%v%vhelp", prefix_rune, prefix_rune)},
       action = .Help,
       help = "show this help message and exit",
     )
-    if !ok {
+    if option == nil {
       deleteArgumentParser(&out)
+      ok = false
       return
     }
   }
@@ -86,12 +90,12 @@ deleteArgumentParser :: proc(self: $T/^ArgumentParser) {
   self.description = {}
   delete(self.epilog, self._allocator)
   self.epilog = {}
-  for _, idx in self.options {
-    deleteArgumentOption(&self.options[idx])
+  for k, v in &self.options {
+    deleteArgumentOption(&v)
   }
   delete(self.options)
   self.options = {}
-  trie.deleteTrie(&self._option_trie)
+  trie.deleteTrie(&self._kw_trie)
   if usage, ok := self._cache_usage.?; ok {
     delete(usage, self._allocator)
     self._cache_usage = nil
@@ -112,8 +116,8 @@ addArgument :: proc(
   required := Maybe(bool){},
   dest := Maybe(string){},
   help := Maybe(string){},
-) -> bool {
-  arg_option, arg_ok := makeArgumentOption(
+) -> ^ArgumentOption {
+  option, arg_ok := makeArgumentOption(
     flags = flags,
     dest = dest,
     nargs = nargs,
@@ -124,37 +128,36 @@ addArgument :: proc(
     allocator = self._allocator,
   )
   if !arg_ok {
-    deleteArgumentOption(&arg_option)
-    return false
+    deleteArgumentOption(&option)
+    return nil
   }
   ok := true
-  if !arg_option._is_positional {
-    for flag, flag_idx in arg_option.flags {
-      found_value, found_ok := trie.getValue(&self._option_trie, flag)
-      if !found_ok {
+  if !option._is_positional {
+    for flag, flag_idx in option.flags {
+      found_value, found_ok := trie.getValue(&self._kw_trie, flag)
+      if !found_ok || found_value not_in self.options {
         continue
       }
-      if found_value < 0 || found_value >= len(self.options) {
-        log.errorf("Found conflicting value that corresponds to invalid index:%v.", found_value)
-        ok = false
-        break
-      }
-      conflicting_option := &self.options[found_value]
-      log.errorf("New option flag:\"%v\" conflicts with existing option flags:%v", flag, conflicting_option.flags)
+      log.errorf("New option flag:\"%v\" conflicts with existing option flags:%v", flag, found_value)
       ok = false
       break
     }
   }
+  // Check if dest conflicts
+  if option.dest in self.options {
+    // TODO(feature) allow for overriding options
+    log.errorf("New option dest:\"%v\" conflicts with existing options", option.dest)
+    ok = false
+  }
   if !ok {
-    deleteArgumentOption(&arg_option)
-    return false
+    deleteArgumentOption(&option)
+    return nil
   }
-  new_index := len(self.options)
-  append(&self.options, arg_option)
-  for flag in arg_option.flags {
-    trie.setValue(&self._option_trie, flag, new_index)
+  self.options[option.dest] = option
+  for flag in option.flags {
+    trie.setValue(&self._kw_trie, flag, option.dest)
   }
-  return true
+  return &self.options[option.dest]
 }
 
 ////////////////////////////////////////
@@ -169,13 +172,13 @@ getUsage :: proc(self: $T/^ArgumentParser) -> string {
   // print keywords first
   usage_pieces := make([dynamic]string)
   append(&usage_pieces, fmt.tprintf("usage %v", self.prog))
-  for option in &self.options {
+  for _, option in &self.options {
     if !option._is_positional {
       append(&usage_pieces, _getUsageString(&option))
     }
   }
   // print then positionals
-  for option in &self.options {
+  for _, option in &self.options {
     if option._is_positional {
       append(&usage_pieces, _getUsageString(&option))
     }
@@ -196,14 +199,14 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
   any_keywords := false
   {
     // print keywords first
-    for option in &self.options {
+    for _, option in &self.options {
       if !option._is_positional {
         any_keywords = true
         break
       }
     }
     // print then positionals
-    for option in &self.options {
+    for _, option in &self.options {
       if option._is_positional {
         any_positionals = true
         break
@@ -219,7 +222,7 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
   if any_positionals {
     append(&lines, "")
     append(&lines, "positional arguments:")
-    for option in &self.options {
+    for _, option in &self.options {
       if option._is_positional {
         append(&lines, _getHelpCache(&option))
       }
@@ -228,7 +231,7 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
   if any_keywords {
     append(&lines, "")
     append(&lines, "keyword arguments:")
-    for option in &self.options {
+    for _, option in &self.options {
       if !option._is_positional {
         append(&lines, _getHelpCache(&option))
       }
@@ -244,56 +247,8 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
 }
 
 ////////////////////////////////////////
+
 /*
-@(require_results, private = "file")
-_runesToString :: proc(values: []int, allocator := context.allocator) -> string {
-  using strings
-  out := make([dynamic]string, context.temp_allocator)
-  for v in values {
-    append(&out, fmt.tprintf("%v", rune(v)))
-  }
-  return join(out[:], "", allocator)
-}
-
-_FoundUnambiguousKeywordOption :: struct {
-  option:  ^ArgumentOption,
-  arg:     string,
-  keyword: string,
-}
-
-_getUnambiguousKeywordOption :: proc(self: $T/^ArgumentParser, arg: string) -> _FoundUnambiguousKeywordOption {
-  using strings
-  context.allocator = context.temp_allocator
-  out := _FoundUnambiguousKeywordOption {
-    arg = arg,
-  }
-  found_kvs := trie.getAllKeyValuesWithPrefix(&self._option_trie, arg)
-  if len(found_kvs) == 1 {
-    //unambiguous
-    found_arg_idx := found_kvs[0].value
-    if found_arg_idx < 0 || found_arg_idx >= len(self.options) {
-      log.warnf("Found invalid index. Skipping")
-    } else {
-      out.option = &self.options[found_arg_idx]
-      // find expected keyword in option and reference it that way (to prevent any allocations)
-      expected_keyword := concatenate({arg, _runesToString(found_kvs[0].key)})
-      for flag in &out.option.flags {
-        if flag == expected_keyword {
-          out.keyword = flag
-          break
-        }
-      }
-    }
-  } else {
-    ambiguous_args := make([dynamic]string)
-    for kv in found_kvs {
-      append(&ambiguous_args, fmt.tprintf("\"%v%v\"", arg, _runesToString(kv.key)))
-    }
-    log.errorf("Found ambiguous arguments for arg:\"%v\". Options:[%v]", arg, join(ambiguous_args[:], ", "))
-  }
-  return out
-}
-
 ParsedArgumentOption :: struct {
   arg:          string,
   arg_type:     ArgumentFlagType,
@@ -363,7 +318,7 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
   arg_loop: for arg_idx < len(args) {
     arg := args[arg_idx]
     arg_idx += 1
-    // found_values := trie.getAllValuesWithPrefix(&self._option_trie, arg)
+    // found_values := trie.getAllValuesWithPrefix(&self._kw_trie, arg)
     // found_arg_idx := -1
     flag_type := _getFlagType(arg, )
     opt_type := _getOp

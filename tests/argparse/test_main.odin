@@ -23,5 +23,6 @@ main :: proc() {
   test_ArgumentNumTokens(&t)
   test_ArgumentOption(&t)
   test_ArgumentParser(&t)
+  test_ArgParse_Keyword(&t)
   tc.report(&t)
 }

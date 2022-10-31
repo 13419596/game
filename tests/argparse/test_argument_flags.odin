@@ -4,7 +4,6 @@ package test_argparse
 
 import "core:fmt"
 import "core:log"
-import "core:runtime"
 import "core:testing"
 import "game:argparse"
 import tc "tests:common"
