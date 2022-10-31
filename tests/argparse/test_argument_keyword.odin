@@ -224,7 +224,7 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      // store, scalar
+      // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -257,7 +257,7 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, lower=2
+      // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -294,7 +294,7 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, ?
+      // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -338,7 +338,7 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, *
+      // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -382,7 +382,7 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, +
+      // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -433,7 +433,7 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      // store, scalar
+      // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -471,7 +471,7 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, lower=2
+      // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -479,7 +479,7 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, ?
+      // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -488,7 +488,7 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, *
+      // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -497,7 +497,7 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, +
+      // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -514,7 +514,7 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      // store, scalar
+      // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -551,7 +551,7 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, lower=2
+      // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -559,7 +559,7 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, ?
+      // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -568,7 +568,7 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, *
+      // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -577,7 +577,7 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, +
+      // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -594,7 +594,7 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      // store, scalar
+      // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -624,7 +624,7 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, lower=2
+      // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -632,7 +632,7 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, ?
+      // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -641,7 +641,7 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, *
+      // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -650,7 +650,7 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, +
+      // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -668,7 +668,7 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     {
-      // store, scalar
+      // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -698,7 +698,7 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       }
     }
     {
-      // store, lower=2
+      // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -706,7 +706,7 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, ?
+      // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -715,7 +715,7 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, *
+      // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
@@ -724,7 +724,7 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       tc.expect(t, !opt_ok)
     }
     {
-      // store, +
+      // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
       defer deleteArgumentParser(&ap)
       tc.expect(t, ap_ok)
