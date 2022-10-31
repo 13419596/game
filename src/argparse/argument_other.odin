@@ -3,13 +3,24 @@ package argparse
 import "core:fmt"
 import "core:strings"
 
-@(require_results, private = "file")
+@(require_results)
 _runesFromString :: proc(s: string, allocator := context.allocator) -> []rune {
   out := make([dynamic]rune, allocator)
   for rn in s {
     append(&out, rn)
   }
   return out[:]
+}
+
+@(require_results)
+_stringFromRunes :: proc(runes: []rune, allocator := context.allocator) -> string {
+  using strings
+  tmp := make([dynamic]string, len(runes), context.temp_allocator)
+  for rn in runes {
+    append(&tmp, fmt.tprintf("%v", rn))
+  }
+  out := join(tmp[:], "", allocator)
+  return out
 }
 
 @(require_results)
