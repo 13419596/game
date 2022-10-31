@@ -136,7 +136,7 @@ test_infix_to_postfix :: proc(t: ^testing.T, verbose: bool = false) {
     defer deleteTokens(&postfix_tokens)
     cmp := areTokenArraysEqual(postfix_tokens[:], expected_postfix_tokens[:])
     if !cmp {
-      log.errorf("Pattern: \"%v\"", pattern)
+      log.errorf("Pattern: %q", pattern)
       log.errorf("Infix Tokens:")
       for token, idx in infix_tokens {
         log.errorf(" % 2d: %v", idx, token)

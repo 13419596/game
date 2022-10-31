@@ -60,7 +60,7 @@ main :: proc() {
     ss := [?]string{"12", "0", "444", "+3", "-3", "a", "33a", "--", "00", "09"}
     for s in ss {
       value, ok := parseUnprefixedInt(s, &n)
-      fmt.printf("s=\"%v\"; value=%v, ok=%v; n=%v\n", s, value, ok, n)
+      fmt.printf("s=%q; value=%v, ok=%v; n=%v\n", s, value, ok, n)
     }
   }
   {
@@ -131,7 +131,7 @@ main :: proc() {
     }
     for pattern in patterns {
       s, n, ok := makeTokenFromString(pattern)
-      fmt.printf("pattern:\"%v\" s:\"%v\" n:%v  ok:%v\n", pattern, s, n, ok)
+      fmt.printf("pattern:%q s:%q n:%v  ok:%v\n", pattern, s, n, ok)
       defer deleteLiteralToken(&s)
     }
   }

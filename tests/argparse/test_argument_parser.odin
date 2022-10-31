@@ -87,7 +87,7 @@ test_getUsage :: proc(t: ^testing.T) {
       addArgument(self = &ap, flags = {"--long"}, required = true, nargs = 1)
       addArgument(self = &ap, flags = {"pos"}, required = true, nargs = 3)
       usage := getUsage(&ap)
-      tc.expect(t, expected_usage == usage, fmt.tprintf("\nExpected:\"%v\".\nGot     :\"%v\"", expected_usage, usage))
+      tc.expect(t, expected_usage == usage, fmt.tprintf("\nExpected:%q.\nGot     :%q", expected_usage, usage))
     }
   }
 }

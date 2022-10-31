@@ -95,7 +95,7 @@ test_printf_float :: proc(t: ^testing.T, num_exponent_bits: uint, $F: typeid) {
     tc.expect(
       t,
       comparison,
-      fmt.bprintf(buf2[:], "%T 2^(% 4d) expected:%v got:%v - string:\"%v\"", F{}, n, expected_first_digit, result_first_digit, result_string),
+      fmt.bprintf(buf2[:], "%T 2^(% 4d) expected:%v got:%v - string:%q", F{}, n, expected_first_digit, result_first_digit, result_string),
     )
   }
 }

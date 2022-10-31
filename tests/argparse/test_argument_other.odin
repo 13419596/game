@@ -27,21 +27,21 @@ test_normalizePrefix :: proc(t: ^testing.T) {
       input := "-/a/b"
       expected := "--a/b"
       output := _normalizePrefix(s = input, old = []rune{'-', '/'}, replacement = '-', allocator = alloc)
-      tc.expect(t, expected == output, fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, expected == output, fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
     {
       input := "-/a/b---"
       expected := "--a/b---"
       output := _normalizePrefix(s = input, old = "-/", replacement = '-', allocator = alloc)
-      tc.expect(t, expected == output, fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, expected == output, fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
     {
       input := "-/a/b---"
       expected := "//a/b---"
       output := _normalizePrefix(s = input, old = "-/", replacement = '/', allocator = alloc)
-      tc.expect(t, expected == output, fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, expected == output, fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
   }
@@ -56,14 +56,14 @@ test_runesFromString :: proc(t: ^testing.T) {
       input := "rün"
       expected := []rune{'r', 'ü', 'n'}
       output := _runesFromString(input[:], alloc)
-      tc.expect(t, isequal_slice(expected, output), fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, isequal_slice(expected, output), fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
     {
       input := ""
       expected := []rune{}
       output := _runesFromString(input[:], alloc)
-      tc.expect(t, isequal_slice(expected, output), fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, isequal_slice(expected, output), fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
   }
@@ -78,14 +78,14 @@ test_stringFromRunes :: proc(t: ^testing.T) {
       input := []rune{'r', 'ü', 'n'}
       expected := "rün"
       output := _stringFromRunes(input[:], alloc)
-      tc.expect(t, expected == output, fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, expected == output, fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
     {
       input := []rune{}
       expected := ""
       output := _stringFromRunes(input[:], alloc)
-      tc.expect(t, expected == output, fmt.tprintf("\nExpected:\"%v\"\n     Out:\"%v\"", expected, output))
+      tc.expect(t, expected == output, fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
       defer delete(output, alloc)
     }
   }

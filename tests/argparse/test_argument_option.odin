@@ -144,7 +144,7 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       usage := _getUsageString(&ao)
       expected_usage := "[-l L]"
-      tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_usage, usage))
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:%q. Got:%q", expected_usage, usage))
     }
     {
       ao, ok := makeArgumentOption(
@@ -159,7 +159,7 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       usage := _getUsageString(&ao)
       expected_usage := "-l LONG LONG LONG LONG LONG LONG LONG LONG LONG LONG"
-      tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_usage, usage))
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:%q. Got:%q", expected_usage, usage))
     }
     {
       ao, ok := makeArgumentOption(flags = []string{"pos"}, action = ArgumentAction.Store, required = true, help = "help", allocator = alloc, nargs = 3)
@@ -167,7 +167,7 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       usage := _getUsageString(&ao)
       expected_usage := "pos pos pos"
-      tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_usage, usage))
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Expected:%q. Got:%q", expected_usage, usage))
     }
     {
       ao, ok := makeArgumentOption(flags = []string{"pos+"}, action = ArgumentAction.Store, help = "Make program more verbose", allocator = alloc, nargs = "+")
@@ -175,7 +175,7 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       usage := _getUsageString(&ao)
       expected_usage := "pos+ [pos+ ...]"
-      tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage, usage))
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:%q. Got:%q", ao.num_tokens, expected_usage, usage))
     }
     {
       ao, ok := makeArgumentOption(flags = []string{"pos*"}, action = ArgumentAction.Store, help = "Make program more verbose", allocator = alloc, nargs = "*")
@@ -185,7 +185,7 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, len(ao.flags) == expected_len, fmt.tprintf("Expected len %v. Got len(flags):%v", expected_len, len(ao.flags)))
       usage := _getUsageString(&ao)
       expected_usage := "[pos* ...]"
-      tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage, usage))
+      tc.expect(t, usage == expected_usage, fmt.tprintf("Num tokens:%v\nExpected:%q. Got:%q", ao.num_tokens, expected_usage, usage))
     }
     {
       ao, ok := makeArgumentOption(flags = []string{"pos?"}, action = ArgumentAction.Store, help = "Make program more verbose", allocator = alloc, nargs = "?")
@@ -193,12 +193,12 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       usage1 := _getUsageString(&ao)
       expected_usage1 := "[pos?]"
-      tc.expect(t, usage1 == expected_usage1, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage1, usage1))
+      tc.expect(t, usage1 == expected_usage1, fmt.tprintf("Num tokens:%v\nExpected:%q. Got:%q", ao.num_tokens, expected_usage1, usage1))
       ao.num_tokens.upper = 2
       expected_usage2 := "[pos? [pos?]]"
       _clearCache(&ao)
       usage2 := _getUsageString(&ao)
-      tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:\"%v\". Got:\"%v\"", ao.num_tokens, expected_usage2, usage2))
+      tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:%q. Got:%q", ao.num_tokens, expected_usage2, usage2))
     }
     {
       ao, ok := makeArgumentOption(
@@ -212,12 +212,12 @@ test_getUsageString :: proc(t: ^testing.T) {
       tc.expect(t, ok)
       usage1 := _getUsageString(&ao)
       expected_usage1 := "[--pos? [POS?]]"
-      tc.expect(t, usage1 == expected_usage1, fmt.tprintf("Num tokens:%v\nExpected:\"%v\".\n     Got:\"%v\"", ao.num_tokens, expected_usage1, usage1))
+      tc.expect(t, usage1 == expected_usage1, fmt.tprintf("Num tokens:%v\nExpected:%q.\n     Got:%q", ao.num_tokens, expected_usage1, usage1))
       ao.num_tokens.upper = 2
       expected_usage2 := "[--pos? [POS? [POS?]]]"
       _clearCache(&ao)
       usage2 := _getUsageString(&ao)
-      tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:\"%v\".\n     Got:\"%v\"", ao.num_tokens, expected_usage2, usage2))
+      tc.expect(t, usage2 == expected_usage2, fmt.tprintf("Num tokens:%v\nExpected:%q.\n     Got:%q", ao.num_tokens, expected_usage2, usage2))
     }
   }
 }

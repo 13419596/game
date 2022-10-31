@@ -37,7 +37,7 @@ _parseNargs :: proc(action: ArgumentAction, vnargs: NargsType) -> (out: _NumToke
         out.lower = 1
         out.upper = {}
       case:
-        log.errorf("If nargs is a string, it must be in the set {{\"?\", \"*\", \"+\"}}. Got:\"%v\"", nargs)
+        log.errorf("If nargs is a string, it must be in the set {{\"?\", \"*\", \"+\"}}. Got:%q", nargs)
         ok = false
       }
     }

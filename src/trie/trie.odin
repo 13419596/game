@@ -334,13 +334,13 @@ pformatTrie :: proc(self: ^$T/Trie($K, $V), allocator := context.allocator) -> s
       }
       append(&line, "── ")
       when K == rune {
-        append(&line, fmt.tprintf("'%v'", item.node.key))
+        append(&line, fmt.tprintf("%q", item.node.key))
       } else {
         append(&line, fmt.tprintf("%v", item.node.key))
       }
       if value, ok := item.node.value.?; ok {
         when V == rune {
-          append(&line, fmt.tprintf(": '%v'", item.node.value))
+          append(&line, fmt.tprintf(": %q", item.node.value))
         } else {
           append(&line, fmt.tprintf(": %v", item.node.value))
         }

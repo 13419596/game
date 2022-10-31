@@ -102,7 +102,7 @@ test_token_nfa :: proc(t: ^testing.T, verbose: bool = false) {
       }
     }
     if !cmp && verbose {
-      fmt.printf("Pattern: \"%v\"\n", pattern)
+      fmt.printf("Pattern: %q\n", pattern)
       fmt.printf("NFA:\n")
       for tok, idx in nfa.tokens {
         fmt.printf("% 2d: %v\n", idx, tok)

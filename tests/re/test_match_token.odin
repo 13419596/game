@@ -106,7 +106,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -120,7 +120,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -133,7 +133,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -146,7 +146,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -159,7 +159,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -173,7 +173,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -186,7 +186,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -199,7 +199,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -212,7 +212,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -226,7 +226,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -239,7 +239,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -252,7 +252,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -265,7 +265,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := expecteds[idx]
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }
@@ -277,7 +277,7 @@ test_doesSetTokenMatch :: proc(t: ^testing.T) {
       expected := true
       result := doesSetTokenMatch(&stok, input)
       if result != expected {
-        fmt.printf("r:'%v' result:%v expected:%v\n", input, result, expected)
+        fmt.printf("r:%q result:%v expected:%v\n", input, result, expected)
       }
       tc.expect(t, (result == expected))
     }

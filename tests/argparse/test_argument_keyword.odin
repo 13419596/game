@@ -355,7 +355,6 @@ test_processKeywordOption_store :: proc(t: ^testing.T) {
       {
         input_trailer := "foo"
         proc_out, ok := _processKeywordOption(option, &proc_state, input_trailer, {input_trailer, input_trailer})
-        log.warnf("state:%v ;; out:%v ;; ok:%v", proc_state, proc_out, ok)
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailing == nil)
         tc.expect(t, proc_out.num_consumed == 0)
@@ -399,7 +398,6 @@ test_processKeywordOption_store :: proc(t: ^testing.T) {
       {
         input_trailer := "foo"
         proc_out, ok := _processKeywordOption(option, &proc_state, input_trailer, {input_trailer, input_trailer})
-        log.warnf("state:%v ;; out:%v ;; ok:%v", proc_state, proc_out, ok)
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailing == nil)
         tc.expect(t, proc_out.num_consumed == 0)

@@ -32,7 +32,7 @@ parseUnprefixedInt :: proc(str: string, n: ^int = nil) -> (value: int, ok: bool)
     } else {
       // either end of number or never started
       if idx == 0 {
-        log.debugf("Unable to parse. Invalid starting rune:'%v'.", rn)
+        log.debugf("Unable to parse. Invalid starting rune:%q.", rn)
         ok = false
         break
       } else {

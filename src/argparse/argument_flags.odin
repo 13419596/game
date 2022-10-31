@@ -159,7 +159,7 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) 
     }
   }
   if first_non_prefix_index == -1 {
-    log.errorf("Could not determine first non-prefix index in flag:\"%v\"", flag)
+    log.errorf("Could not determine first non-prefix index in flag:%q", flag)
     return
   }
   out = flag[first_non_prefix_index:]
@@ -186,17 +186,17 @@ _areFlagsOkay :: proc(flags: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
     opt_type := _getFlagType(flag, prefix)
     switch opt_type {
     case .Invalid:
-      log.errorf("Invalid flag that is neither short, long, nor position flag. flags[%v]:\"%v\"", idx, flag)
+      log.errorf("Invalid flag that is neither short, long, nor position flag. flags[%v]:%q", idx, flag)
       ok = false
     case .Positional:
       if has_short_or_long {
-        log.errorf("Cannot mix positional and keyword flags in a single argument. flags[%v]:\"%v\"", idx, flag)
+        log.errorf("Cannot mix positional and keyword flags in a single argument. flags[%v]:%q", idx, flag)
         ok = false
       } else if !has_positional {
         has_positional = true
         break
       } else {
-        log.errorf("Only a single positional flag is allowed. flags[%v]:\"%v\"", idx, flag)
+        log.errorf("Only a single positional flag is allowed. flags[%v]:%q", idx, flag)
         ok = false
       }
       fallthrough
@@ -205,7 +205,7 @@ _areFlagsOkay :: proc(flags: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
     case .Long:
       has_short_or_long = true
       if has_positional {
-        log.errorf("Cannot mix positional and keyword flags in a single argument. flags[%v]:\"%v\"", idx, flag)
+        log.errorf("Cannot mix positional and keyword flags in a single argument. flags[%v]:%q", idx, flag)
         ok = false
       }
     }

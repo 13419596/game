@@ -474,7 +474,7 @@ _processToken :: proc(state: ^_PostfixToNfaState, token: ^Token) -> bool {
 @(require_results)
 makeTokenNfaFromPattern :: proc(pattern: string, flags: RegexFlags = {}, allocator := context.allocator) -> (out: TokenNfa, ok: bool) {
   ok = false
-  log.debugf("Pattern \"%v\"", pattern)
+  log.debugf("Pattern %q", pattern)
   infix_tokens, infix_ok := parseTokensFromString(pattern, flags, context.temp_allocator)
   if !infix_ok {
     return

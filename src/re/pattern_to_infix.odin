@@ -595,7 +595,7 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
   loop: for head_idx < len(pattern) {
     token, bytes_parsed, token_ok := _parseSingleTokenFromString(pattern[head_idx:])
     if !token_ok {
-      log.errorf("Unable to parse token at position:%v. pattern: \"%v\"", head_idx, pattern)
+      log.errorf("Unable to parse token at position:%v. pattern: %q", head_idx, pattern)
       ok = false
       break loop
     }
@@ -627,7 +627,7 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
       pop_group_idx, pop_ok := pop_safe(&group_index_stack)
       if !pop_ok {
         // unbalanced levels
-        log.errorf("Extra group end ')' at index:%v. pattern: \"%v\"", head_idx, pattern)
+        log.errorf("Extra group end ')' at index:%v. pattern: %q", head_idx, pattern)
         ok = false
         break loop
       }
@@ -648,7 +648,7 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
       qtok_is_01 := qtok == QuantityToken{0, 1}
       if prev_token == nil {
         // cannot have quantifier right at the beginning: 
-        log.errorf("Nothing to repeat at position:%v. Quantifiers are not allowed at the beginning of a pattern. pattern: \"%v\"", head_idx, pattern)
+        log.errorf("Nothing to repeat at position:%v. Quantifiers are not allowed at the beginning of a pattern. pattern: %q", head_idx, pattern)
         ok = false
         break loop
       } else {
@@ -656,30 +656,30 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
         case QuantityToken:
           if qtok_is_01 {
             // TODO support lazy
-            log.errorf("Lazy quantifier at position:%v is not currently supported. pattern: \"%v\"", head_idx, pattern)
+            log.errorf("Lazy quantifier at position:%v is not currently supported. pattern: %q", head_idx, pattern)
           } else {
-            log.errorf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
+            log.errorf("Nothing to repeat at position:%v. pattern: %q", head_idx, pattern)
           }
           ok = false
           break loop
         case AssertionToken:
-          log.errorf("Nothing to repeat at position:%v. pattern: \"%v\"", head_idx, pattern)
+          log.errorf("Nothing to repeat at position:%v. pattern: %q", head_idx, pattern)
           ok = false
           break loop
         case GroupBeginToken:
-          log.errorf("Nothing to repeat at position:%v. Quantifier cannot appear at beginning of group. pattern: \"%v\"", head_idx, pattern)
+          log.errorf("Nothing to repeat at position:%v. Quantifier cannot appear at beginning of group. pattern: %q", head_idx, pattern)
           ok = false
           break loop
         case AlternationToken:
-          log.errorf("Nothing to repeat at position:%v. Quantifier cannot appear after alternation token. pattern: \"%v\"", head_idx, pattern)
+          log.errorf("Nothing to repeat at position:%v. Quantifier cannot appear after alternation token. pattern: %q", head_idx, pattern)
           ok = false
           break loop
         case SpecialNfaToken:
-          log.errorf("Should not encounter a token of type:%T when parsing infix tokens. pattern: \"%v\"", head_idx, SpecialNfaToken{}, pattern)
+          log.errorf("Should not encounter a token of type:%T when parsing infix tokens. pattern: %q", head_idx, SpecialNfaToken{}, pattern)
           ok = false
           break loop
         case ImplicitToken:
-          log.errorf("Should not encounter a token of type:%T when parsing infix tokens. pattern: \"%v\"", head_idx, SpecialNfaToken{}, pattern)
+          log.errorf("Should not encounter a token of type:%T when parsing infix tokens. pattern: %q", head_idx, SpecialNfaToken{}, pattern)
           ok = false
           break loop
         case LiteralToken:
@@ -700,7 +700,7 @@ parseTokensFromString :: proc(pattern: string, flags: RegexFlags = {}, allocator
     prev_token = token
   }
   if len(group_index_stack) != 0 {
-    log.errorf("Too many group beginnings and not enough ends. pattern: \"%v\"", pattern)
+    log.errorf("Too many group beginnings and not enough ends. pattern: %q", pattern)
     ok = false
   }
   if !ok {

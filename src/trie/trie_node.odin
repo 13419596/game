@@ -40,7 +40,7 @@ _recursePrintNode :: proc(self: ^$T/_TrieNode($K, $V), depth: int = 0) {
   for i in 0 ..< depth {
     fmt.printf(" ")
   }
-  fmt.printf("'%v' ", self.key)
+  fmt.printf("%q ", self.key)
   if value, ok := self.value.?; ok {
     fmt.printf(": %v", value)
   }

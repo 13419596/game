@@ -143,7 +143,7 @@ addArgument :: proc(
       if !found_ok || found_value not_in self.options {
         continue
       }
-      log.errorf("New option flag:\"%v\" conflicts with existing option flags:%v", flag, found_value)
+      log.errorf("New option flag:%q conflicts with existing option flags:%v", flag, found_value)
       ok = false
       break
     }
@@ -151,7 +151,7 @@ addArgument :: proc(
   // Check if dest conflicts
   if option.dest in self.options {
     // TODO(feature) allow for overriding options
-    log.errorf("New option dest:\"%v\" conflicts with existing options", option.dest)
+    log.errorf("New option dest:%q conflicts with existing options", option.dest)
     ok = false
   }
   if !ok {
@@ -335,7 +335,7 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
     }
     switch len(found_values) {
     case 0:
-      log.debugf("Unknown argument:\"%v\"", arg)
+      log.debugf("Unknown argument:%q", arg)
       append(&unknown_args, arg)
       ok = false
     case 1:
@@ -354,17 +354,17 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
           option := &self.options[found_idx]
           for flag in option.flags {
             if len(ambiguous_args) == 0 {
-              append(&ambiguous_args, fmt.tprintf("\"%v\"", flag))
+              append(&ambiguous_args, fmt.tprintf("%q", flag))
             } else {
-              append(&ambiguous_args, fmt.tprintf(", \"%v\"", flag))
+              append(&ambiguous_args, fmt.tprintf(", %q", flag))
             }
           }
         }
-        log.errorf("Found amgiguous arguments for arg:\"%v\". Options:%v", arg, ambiguous_args)
+        log.errorf("Found amgiguous arguments for arg:%q. Options:%v", arg, ambiguous_args)
       }
       ok = false
     case:
-      log.errorf("Invalid arg:\"%v\"", arg)
+      log.errorf("Invalid arg:%q", arg)
       append(&unknown_args, arg)
       ok = false
     }

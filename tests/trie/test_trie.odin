@@ -133,7 +133,7 @@ test_getLongestPrefix :: proc(t: ^testing.T) {
     k, v := getLongestPrefix(&tr, "abcdeffff")
     expected := "abcdef"
     tc.expect(t, v == 0)
-    tc.expect(t, k == expected, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected, k))
+    tc.expect(t, k == expected, fmt.tprintf("Expected:%q. Got:%q", expected, k))
   }
   {
     arr := []int{97, 98, 99, 100, 101, 102, 102, 102, 102}
@@ -145,7 +145,7 @@ test_getLongestPrefix :: proc(t: ^testing.T) {
     for idx in 0 ..< min(len(k), len(expected_k)) {
       all_eq &= (expected_k[idx] == k[idx])
     }
-    tc.expect(t, all_eq, fmt.tprintf("Expected:\"%v\". Got:\"%v\"", expected_k, k))
+    tc.expect(t, all_eq, fmt.tprintf("Expected:%q. Got:%q", expected_k, k))
   }
   {
     k, v := getLongestPrefix(&tr, "abcde*******")
