@@ -223,10 +223,7 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
         switch data in &state.data {
         case bool:
         case int:
-        case any:
         case string:
-        case [dynamic]any:
-          append(&data, 3)
         case [dynamic]string:
           append(&data, "string data")
           append(&data, "string data")

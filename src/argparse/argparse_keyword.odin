@@ -122,9 +122,7 @@ _determineKeywordOption :: proc(kw_trie: $T/^trie.Trie(int, $V), arg: string) ->
 _OptionProcessingStateData :: union {
   bool, // store true / false
   int, // count
-  any, // store const
   string, // store (nargs=1)
-  [dynamic]any, // append const
   [dynamic]string, // store(nargs=*), extend, append(nargs=1)
   [dynamic][]string, // append(nargs=*)
 }
@@ -188,16 +186,11 @@ _deleteOptionProcessingState :: proc(self: ^_OptionProcessingState) {
   switch data in &self.data {
   case bool:
     data = {}
-  case any:
-    data = {}
   case int:
     data = {}
   case string:
     data = {}
   case [dynamic]string:
-    delete(data)
-    data = {}
-  case [dynamic]any:
     delete(data)
     data = {}
   case [dynamic][]string:
