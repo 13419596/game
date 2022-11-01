@@ -61,11 +61,11 @@ _parseNargs :: proc(action: ArgumentAction, vnargs: NargsType) -> (out: _NumToke
       out.upper = 0
     ///////////////
     case .Append:
-      out.lower = 0
+      out.lower = 1
       out.upper = 1
     case .Extend:
-      out.lower = 0
-      out.upper = {}
+      out.lower = 1
+      out.upper = 1
     case .Store:
       out.lower = 1
       out.upper = 1
