@@ -267,7 +267,7 @@ test_processKeywordOption :: proc(t: ^testing.T) {
     case .Append:
       tc.expect(t, false, "untested option")
     case .Count:
-      tc.expect(t, false, "untested option")
+      test_processKeywordOption_Count(t)
     }
   }
 }
@@ -1005,6 +1005,88 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
         expected2 := []string{input_trailer, input_arg0, input_arg1, input_arg2, input_arg2, input_arg2}
         tc.expect(t, isequal_slice(data_strs^[:], expected2), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_strs^))
       }
+    }
+  }
+}
+
+@(test)
+test_processKeywordOption_Count :: proc(t: ^testing.T) {
+  using argparse
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  for alloc in allocs {
+    {
+      // scalar
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, action = .Count)
+      tc.expect(t, option != nil)
+      tc.expect(t, opt_ok)
+      proc_state, proc_state_ok := _makeOptionProcessingState_fromArgumentOption(option, alloc)
+      defer _deleteOptionProcessingState(&proc_state)
+      data_int, data_int_ok := &proc_state.data.(int)
+      tc.expect(t, data_int_ok)
+      {
+        proc_out, ok := _processKeywordOption(option, &proc_state, {}, {})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, data_int^ == 1)
+      }
+      {
+        input_trailer := "foo"
+        proc_out, ok := _processKeywordOption(option = option, state = &proc_state, trailer = input_trailer, args = {})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailer != nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, data_int^ == 2)
+      }
+      {
+        input_arg0 := "bar"
+        proc_out, ok := _processKeywordOption(option, &proc_state, nil, {input_arg0, "extra", "extra33"})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailer == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, data_int^ == 3)
+        proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg0, "extra", "extra33"})
+        tc.expect(t, ok, "Expected okay")
+        tc.expect(t, proc_out.trailer == nil)
+        tc.expect(t, proc_out.num_consumed == 0)
+        tc.expect(t, data_int^ == 4)
+      }
+    }
+    {
+      // lower=2
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = 2, action = .Count)
+      tc.expect(t, !opt_ok)
+    }
+    {
+      // ?
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = "?", action = .Count)
+      tc.expect(t, option == nil)
+      tc.expect(t, !opt_ok)
+    }
+    {
+      // *
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = "*", action = .Count)
+      tc.expect(t, option == nil)
+      tc.expect(t, !opt_ok)
+    }
+    {
+      // +
+      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
+      defer deleteArgumentParser(&ap)
+      tc.expect(t, ap_ok)
+      option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = "+", action = .Count)
+      tc.expect(t, option == nil)
+      tc.expect(t, !opt_ok)
     }
   }
 }
