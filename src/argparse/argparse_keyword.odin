@@ -124,7 +124,7 @@ _OptionProcessingStateData :: union {
   int, // count
   string, // store (nargs=1)
   [dynamic]string, // store(nargs=*), extend, append(nargs=1)
-  [dynamic][]string, // append(nargs=*)
+  [dynamic][dynamic]string, // append(nargs=*)
 }
 
 _OptionProcessingState :: struct {
@@ -160,7 +160,7 @@ _makeOptionProcessingState :: proc(action: ArgumentAction, num_tokens: _NumToken
       out.data = make([dynamic]string)
     } else {
       // list of lists
-      out.data = make([dynamic][]string, allocator)
+      out.data = make([dynamic][dynamic]string, allocator)
     }
   case .Extend:
     out.data = make([dynamic]string, allocator)
@@ -193,7 +193,7 @@ _deleteOptionProcessingState :: proc(self: ^_OptionProcessingState) {
   case [dynamic]string:
     delete(data)
     data = {}
-  case [dynamic][]string:
+  case [dynamic][dynamic]string:
     for v in &data {
       delete(v)
     }
@@ -259,7 +259,7 @@ _processKeywordOption :: proc(
       ok = true
       break
     }
-    if vvals, vvals_ok := &state.data.([dynamic][]string); vvals_ok {
+    if vvals, vvals_ok := &state.data.([dynamic][dynamic]string); vvals_ok {
       // append list
       if trail, trail_ok := out.trailer.?; trail_ok {
         if upper, upper_ok := option.num_tokens.upper.?; upper_ok {
@@ -273,7 +273,7 @@ _processKeywordOption :: proc(
         // unbounded is fine
         new_list := make([dynamic]string, 1, state._allocator)
         new_list[0] = trail
-        append(vvals, new_list[:])
+        append(vvals, new_list)
         out.trailer = nil // consume trailer
       } else {
         if len(args) < option.num_tokens.lower {
@@ -285,7 +285,7 @@ _processKeywordOption :: proc(
         for idx in 0 ..< out.num_consumed {
           new_list[idx] = args[idx]
         }
-        append(vvals, new_list[:])
+        append(vvals, new_list)
       }
       ok = true
     }
