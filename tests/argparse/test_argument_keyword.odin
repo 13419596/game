@@ -249,12 +249,31 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
 
 @(test)
 test_processKeywordOption :: proc(t: ^testing.T) {
-  test_processKeywordOption_Store(t)
-  test_processKeywordOption_StoreTrue(t)
-  test_processKeywordOption_StoreFalse(t)
-  test_processKeywordOption_Help(t)
-  test_processKeywordOption_Version(t)
-  test_processKeywordOption_Extend(t)
+  using argparse
+  for action in ArgumentAction {
+    switch action {
+    case .Store:
+      test_processKeywordOption_Store(t)
+    case .StoreTrue:
+      test_processKeywordOption_StoreTrue(t)
+    case .StoreFalse:
+      test_processKeywordOption_StoreFalse(t)
+    case .Help:
+      test_processKeywordOption_Help(t)
+    case .Version:
+      test_processKeywordOption_Version(t)
+    case .Extend:
+      test_processKeywordOption_Extend(t)
+    case .StoreConst:
+      tc.expect(t, false, "untested option")
+    case .Append:
+      tc.expect(t, false, "untested option")
+    case .AppendConst:
+      tc.expect(t, false, "untested option")
+    case .Count:
+      tc.expect(t, false, "untested option")
+    }
+  }
 }
 
 @(test)
