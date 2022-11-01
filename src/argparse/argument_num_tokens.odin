@@ -48,10 +48,6 @@ _parseNargs :: proc(action: ArgumentAction, vnargs: NargsType) -> (out: _NumToke
       fallthrough
     case .StoreFalse:
       fallthrough
-    case .StoreConst:
-      fallthrough
-    case .AppendConst:
-      fallthrough
     case .Count:
       fallthrough
     case .Help:
@@ -80,10 +76,6 @@ _isPositionalOptionNumTokensValid :: proc(action: ArgumentAction, num_tokens: _N
     fallthrough
   case .StoreFalse:
     fallthrough
-  case .StoreConst:
-    fallthrough
-  case .AppendConst:
-    fallthrough
   case .Count:
     fallthrough
   case .Help:
@@ -106,10 +98,6 @@ _isKeywordOptionNumTokensValid :: proc(action: ArgumentAction, num_tokens: _NumT
   case .StoreTrue:
     fallthrough
   case .StoreFalse:
-    fallthrough
-  case .StoreConst:
-    fallthrough
-  case .AppendConst:
     fallthrough
   case .Count:
     fallthrough

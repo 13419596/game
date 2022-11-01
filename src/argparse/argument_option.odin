@@ -8,10 +8,7 @@ import "core:strings"
 ArgumentOption :: struct {
   flags:          []string,
   dest:           string,
-  constant_value: any,
-  default:        any,
-  // type
-  choices:        []any,
+  const:          any,
   action:         ArgumentAction,
   required:       bool,
   help:           string,
@@ -43,10 +40,9 @@ makeArgumentOption :: proc(
     return
   }
   out = ArgumentOption {
-    action       = action,
-    flags        = _cleanFlags(flags, prefix, allocator),
-    _allocator   = allocator,
-    _is_composed = isArgumentActionComposed(action),
+    action     = action,
+    flags      = _cleanFlags(flags, prefix, allocator),
+    _allocator = allocator,
   }
   out._is_positional = _isPositionalFlag(out.flags[0])
   if num_tokens, num_tokens_ok := _parseNargs(out.action, nargs); num_tokens_ok {

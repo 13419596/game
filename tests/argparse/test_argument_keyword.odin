@@ -264,11 +264,7 @@ test_processKeywordOption :: proc(t: ^testing.T) {
       test_processKeywordOption_Version(t)
     case .Extend:
       test_processKeywordOption_Extend(t)
-    case .StoreConst:
-      tc.expect(t, false, "untested option")
     case .Append:
-      tc.expect(t, false, "untested option")
-    case .AppendConst:
       tc.expect(t, false, "untested option")
     case .Count:
       tc.expect(t, false, "untested option")

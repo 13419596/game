@@ -150,10 +150,6 @@ _makeOptionProcessingState :: proc(action: ArgumentAction, num_tokens: _NumToken
     out.data = false
   case .StoreFalse:
     out.data = true
-  case .StoreConst:
-    break
-  case .AppendConst:
-    out.data = make([dynamic]any)
   case .Store:
     if upper, upper_ok := num_tokens.upper.?; upper_ok && (num_tokens.lower == 1 && upper == 1) {
       out.data = ""
@@ -252,16 +248,6 @@ _processKeywordOption :: proc(
   case .StoreFalse:
     if tf, tf_ok := &state.data.(bool); tf_ok {
       tf^ = false
-      ok = true
-    }
-  case .StoreConst:
-    if val, val_ok := &state.data.(any); val_ok {
-      val^ = option.default
-      ok = true
-    }
-  case .AppendConst:
-    if vals, vals_ok := &state.data.([dynamic]any); vals_ok {
-      append(vals, option.default)
       ok = true
     }
   case .Append:
