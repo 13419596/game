@@ -31,11 +31,52 @@ deleteTrie :: proc(self: ^$T/Trie($K, $V)) {
   }
   _deleteTrieNode(&self.root, self._allocator)
 }
+/////////////////////////////////////
+
+_findLongestPrefix :: proc(self: ^$T/Trie($K, $V), key: []K) -> []K {
+  // Finds the longest matching prefix in trie regardless of value
+  node := &self.root
+  longest_value: Maybe(V) = nil
+  longest_idx := 0
+  for k, idx in key {
+    if k in node.children {
+      node = &node.children[k]
+    } else {
+      break
+    }
+    longest_idx = idx
+  }
+  return key[:longest_idx + 1]
+}
+
+_findLongestPrefix_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> string where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
+  // Finds the longest matching prefix in trie regardless of value
+  node := &self.root
+  longest_value: Maybe(V) = nil
+  longest_idx := 0
+  for k, idx in key {
+    kint := K(k)
+    if kint in node.children {
+      node = &node.children[kint]
+    } else {
+      break
+    }
+    longest_idx = idx
+  }
+  return key[:longest_idx + 1]
+}
+
+findLongestPrefix :: proc {
+  _findLongestPrefix,
+  _findLongestPrefix_int_string,
+}
+
+///////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////
 
-_getLongestPrefix :: proc(self: ^$T/Trie($K, $V), key: []K) -> ([]K, Maybe(V)) {
-  // Finds the longest matching prefix in trie and returns the value there. 
+_findLongestPrefixWithValue :: proc(self: ^$T/Trie($K, $V), key: []K) -> ([]K, Maybe(V)) {
+  // Finds the longest matching prefix in trie that has a value
   node := &self.root
   longest_value: Maybe(V) = nil
   longest_idx := 0
@@ -53,8 +94,9 @@ _getLongestPrefix :: proc(self: ^$T/Trie($K, $V), key: []K) -> ([]K, Maybe(V)) {
   return key[:longest_idx + 1], longest_value
 }
 
-_getLongestPrefix_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> (string, Maybe(V)) where intrinsics.type_is_integer(K) && size_of(K) >= 4 {
-  // Finds the longest matching prefix in trie and returns the value there. 
+_findLongestPrefixWithValue_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> (string, Maybe(V)) where intrinsics.type_is_integer(K) &&
+  size_of(K) >= 4 {
+  // Finds the longest matching prefix in trie that has a value there. 
   node := &self.root
   longest_value: Maybe(V) = nil
   longest_idx := 0
@@ -73,9 +115,9 @@ _getLongestPrefix_int_string :: proc(self: ^$T/Trie($K, $V), key: string) -> (st
   return key[:longest_idx + 1], longest_value
 }
 
-getLongestPrefix :: proc {
-  _getLongestPrefix,
-  _getLongestPrefix_int_string,
+findLongestPrefixWithValue :: proc {
+  _findLongestPrefixWithValue,
+  _findLongestPrefixWithValue_int_string,
 }
 
 ///////////////////////////////////////////////////////////////////////////
