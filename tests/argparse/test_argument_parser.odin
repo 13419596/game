@@ -112,10 +112,36 @@ test_getHelp :: proc(t: ^testing.T) {
 }
 
 /////////////////////////////////////////
+
+@(private = "file")
+MakeArgumentParserArgs :: struct {
+  add_help: bool,
+}
+
+@(private = "file")
+AddArgumentArgs :: struct {
+  action: argparse.ArgumentAction,
+  flags:  []string,
+}
+
+@(private = "file")
+ParseKnownArgsTest :: struct {
+  input:        []string,
+  expected_ok:  bool,
+  expected_out: argparse.ParsedData,
+}
+
+@(private = "file")
+ParseKnownArgsFixture :: struct {
+  make_argparser_args: MakeArgumentParserArgs,
+  add_arg_args:        []AddArgumentArgs,
+}
+
+
 @(test)
 test_parseKnownArgs :: proc(t: ^testing.T) {
   using argparse
-  allocs := []runtime.Allocator{context.allocator} //context.temp_allocator}
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
     if false {
       ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)

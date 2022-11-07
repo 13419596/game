@@ -19,19 +19,18 @@ _DEFAULT_EQUALITY_RUNE: rune : '='
 _TrieValueType :: string
 
 ArgumentParser :: struct {
-  prog:          string, // The name of the program (default: sys.argv[0])
-  description:   string, // A usage message (default: auto-generated from arguments)
-  epilog:        string, // Text following the argument descriptions
-  prefix_rune:   rune, // Character that prefix optional arguments
-  equality_rune: rune, // Character that separates arguments from value typically '='
-  add_help:      bool, // Add a -h/-help option
-  allow_abbrev:  bool, // Allow long options to be abbreviated unambiguously
-  exit_on_error: bool,
-  options:       map[string]ArgumentOption,
-  _allocator:    runtime.Allocator,
-  _kw_trie:      trie.Trie(int, _TrieValueType), // int(rune) -> int option index
-  _cache_usage:  Maybe(string),
-  _cache_help:   Maybe(string),
+  prog:           string, // The name of the program (default: sys.argv[0])
+  description:    string, // A usage message (default: auto-generated from arguments)
+  epilog:         string, // Text following the argument descriptions
+  allow_abbrev:   bool, // Allow long options to be abbreviated unambiguously
+  exit_on_error:  bool,
+  options:        map[string]ArgumentOption,
+  _allocator:     runtime.Allocator,
+  _kw_trie:       trie.Trie(int, _TrieValueType), // int(rune) -> int option index
+  _equality_rune: rune, // Character that separates arguments from value typically '='
+  _prefix_rune:   rune, // Character that prefix optional arguments
+  _cache_usage:   Maybe(string),
+  _cache_help:    Maybe(string),
 }
 
 @(require_results)
@@ -54,10 +53,10 @@ makeArgumentParser :: proc(
     prog = {},
     description = clone(description, allocator),
     epilog = clone(epilog),
-    prefix_rune = prefix_rune,
-    equality_rune = equality_rune,
     allow_abbrev = allow_abbrev,
     options = make(map[string]ArgumentOption, 0, allocator),
+    _prefix_rune = prefix_rune,
+    _equality_rune = equality_rune,
     _allocator = allocator,
     _kw_trie = trie.makeTrie(int, _TrieValueType, allocator),
   }
@@ -132,7 +131,7 @@ addArgument :: proc(
     action = action,
     required = required,
     help = help,
-    prefix = self.prefix_rune,
+    prefix = self._prefix_rune,
     allocator = self._allocator,
   )
   if !arg_ok {
@@ -364,7 +363,12 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
     // } else {
     //   arg_idx += 1
     // }
-    fko, fko_ok := _determineKeywordOption(kw_trie = &self._kw_trie, arg = arg_or_trailer, prefix_rune = self.prefix_rune, equality_rune = self.equality_rune)
+    fko, fko_ok := _determineKeywordOption(
+      kw_trie = &self._kw_trie,
+      arg = arg_or_trailer,
+      prefix_rune = self._prefix_rune,
+      equality_rune = self._equality_rune,
+    )
     log.debugf("FKO: %v", fko)
     if !fko_ok {
       append(&tmp_unknown, arg_or_trailer)

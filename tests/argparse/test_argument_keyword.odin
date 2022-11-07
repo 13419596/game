@@ -336,7 +336,7 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
         }
       }
       for test, test_idx in &fixture.tests {
-        out, ok := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap.prefix_rune, equality_rune = ap.equality_rune)
+        out, ok := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap._prefix_rune, equality_rune = ap._equality_rune)
         tc.expect(t, test.expected_ok == ok, fmt.tprintf("Test[%v][%v]: ok: Expected:%v  Got:%v", fixture_idx, test_idx, test.expected_ok, ok))
         tc.expect(
           t,
@@ -383,7 +383,7 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
     //   }
     //   {
     //     input := "--coun=33"
-    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap.prefix_rune)
+    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap._prefix_rune)
     //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
     //     expected := _FoundKeywordOption(string) {
     //       arg                  = input,
@@ -396,7 +396,7 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
     //   }
     //   {
     //     input := "-sh"
-    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap.prefix_rune)
+    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap._prefix_rune)
     //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
     //     expected := _FoundKeywordOption(string) {
     //       arg                  = input,
@@ -409,7 +409,7 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
     //   }
     //   {
     //     input := "-sh=33"
-    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap.prefix_rune)
+    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap._prefix_rune)
     //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
     //     expected := _FoundKeywordOption(string) {
     //       arg                  = input,
