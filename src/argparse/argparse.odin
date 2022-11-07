@@ -9,10 +9,10 @@ import "core:strings"
 import "core:unicode/utf8"
 import "game:trie"
 
-@(private)
+@(private = "file")
 _DEFAULT_PREFIX_RUNE: rune : '-'
 
-@(private)
+@(private = "file")
 _DEFAULT_EQUALITY_RUNE: rune : '='
 
 @(private)
@@ -124,7 +124,7 @@ addArgument :: proc(
 ) {
   out = nil
   ok = false
-  option, arg_ok := makeArgumentOption(
+  option, arg_ok := _makeArgumentOption(
     flags = flags,
     dest = dest,
     nargs = nargs,
@@ -183,13 +183,13 @@ getUsage :: proc(self: $T/^ArgumentParser) -> string {
   append(&usage_pieces, fmt.tprintf("usage %v", self.prog))
   for _, option in &self.options {
     if !option._is_positional {
-      append(&usage_pieces, _getUsageString(&option))
+      append(&usage_pieces, _getUsageString(self = &option, prefix = self._prefix_rune))
     }
   }
   // print then positionals
   for _, option in &self.options {
     if option._is_positional {
-      append(&usage_pieces, _getUsageString(&option))
+      append(&usage_pieces, _getUsageString(self = &option, prefix = self._prefix_rune))
     }
   }
   out := join(usage_pieces[:], " ", self._allocator)
@@ -233,7 +233,7 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
     append(&lines, "positional arguments:")
     for _, option in &self.options {
       if option._is_positional {
-        append(&lines, _getHelpCache(&option))
+        append(&lines, _getHelpCache(self = &option, prefix = self._prefix_rune))
       }
     }
   }
@@ -242,7 +242,7 @@ getHelp :: proc(self: $T/^ArgumentParser) -> string {
     append(&lines, "keyword arguments:")
     for _, option in &self.options {
       if !option._is_positional {
-        append(&lines, _getHelpCache(&option))
+        append(&lines, _getHelpCache(self = &option, prefix = self._prefix_rune))
       }
     }
   }
@@ -363,17 +363,12 @@ parseKnownArgs :: proc(self: $T/^ArgumentParser, args: []string, allocator := co
     // } else {
     //   arg_idx += 1
     // }
-    fko, fko_ok := _determineKeywordOption(
-      kw_trie = &self._kw_trie,
-      arg = arg_or_trailer,
-      prefix_rune = self._prefix_rune,
-      equality_rune = self._equality_rune,
-    )
+    fko := _determineKeywordOption(kw_trie = &self._kw_trie, arg = arg_or_trailer, prefix_rune = self._prefix_rune, equality_rune = self._equality_rune)
     log.debugf("FKO: %v", fko)
-    if !fko_ok {
-      append(&tmp_unknown, arg_or_trailer)
-      continue
-    }
+    // if !fko_ok {
+    //   append(&tmp_unknown, arg_or_trailer)
+    //   continue
+    // }
     dest := fko.value
     option, option_found := self.options[dest]
     if !option_found {

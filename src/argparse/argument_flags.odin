@@ -13,7 +13,7 @@ _ArgumentFlagType :: enum {
 
 /////////////////////////////
 
-_isPositionalFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
+_isPositionalFlag :: proc(flag: string, prefix: rune) -> bool {
   rn_idx := 0
   for rn in flag {
     return rn != prefix
@@ -21,7 +21,7 @@ _isPositionalFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> 
   return false
 }
 
-_isShortFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
+_isShortFlag :: proc(flag: string, prefix: rune) -> bool {
   rn_idx := 0
   for rn in flag {
     switch rn_idx {
@@ -37,7 +37,7 @@ _isShortFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool 
   return false
 }
 
-_isLongFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
+_isLongFlag :: proc(flag: string, prefix: rune) -> bool {
   rn_idx := 0
   for rn in flag {
     switch rn_idx {
@@ -57,7 +57,7 @@ _isLongFlag :: proc(flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> bool {
   return false
 }
 
-_getFlagType :: proc(flag: string, prefix := _DEFAULT_PREFIX_RUNE) -> _ArgumentFlagType {
+_getFlagType :: proc(flag: string, prefix: rune) -> _ArgumentFlagType {
   if _isShortFlag(flag, prefix) {
     return .Short
   } else if _isLongFlag(flag, prefix) {
@@ -71,14 +71,14 @@ _getFlagType :: proc(flag: string, prefix := _DEFAULT_PREFIX_RUNE) -> _ArgumentF
 /////////////////////////////
 
 @(require_results)
-_cleanFlag :: proc(raw_flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> string {
+_cleanFlag :: proc(raw_flag: string, prefix: rune, allocator := context.allocator) -> string {
   context.allocator = allocator
   out := _normalizePrefix(s = raw_flag, old = []rune{prefix}, replacement = prefix)
   return out
 }
 
 @(require_results)
-_cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> [dynamic]string {
+_cleanFlags :: proc(raw_flags: []string, prefix: rune, allocator := context.allocator) -> [dynamic]string {
   // Cleans all flag prefixes
   context.allocator = allocator
   flags := make([dynamic]string, len(raw_flags))
@@ -91,7 +91,7 @@ _cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, al
 /////////////////////////////
 
 @(require_results)
-_getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) -> (out: string, ok: bool) {
+_getDestFromFlags :: proc(flags: []string, prefix: rune) -> (out: string, ok: bool) {
   // Gets first long flag, (if none, then short or pos) and strips prefix
   using strings
   out = ""
@@ -127,7 +127,7 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) 
 
 /////////////////////////////
 
-_areFlagsOkay :: proc(flags: []string, prefix := _DEFAULT_PREFIX_RUNE) -> bool {
+_areFlagsOkay :: proc(flags: []string, prefix: rune) -> bool {
   // Checks that
   // - flags list is non-empty
   // - only one positional

@@ -56,277 +56,123 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
 }
 
 //////////////////////////////////////////////////////////////////
+@(private = "file")
+MakeArgumentParserArgs :: struct {
+  add_help: bool,
+}
 
 @(private = "file")
-MakeArgumentArgs :: struct {
+AddArgumentArgs :: struct {
   action: argparse.ArgumentAction,
   flags:  []string,
 }
 
 @(private = "file")
-FoundKeywordTest :: struct {
-  input:        string,
-  expected_ok:  bool,
-  expected_out: argparse._FoundKeywordOption(string),
+DetermineKeywordOptionTest :: struct {
+  input:    string,
+  expected: argparse._FoundKeywordOption(string),
 }
 
 @(private = "file")
-TestFixture :: struct {
-  add_help:      bool,
-  make_arg_args: []MakeArgumentArgs,
-  tests:         []FoundKeywordTest,
+DetermineKeywordOptionFixture :: struct {
+  argparser_args: MakeArgumentParserArgs,
+  make_arg_args:  []AddArgumentArgs,
+  tests:          []DetermineKeywordOptionTest,
 }
 
 @(test)
 test_determineKeywordOption :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
-  fixtures := []TestFixture{
+  fixtures := []DetermineKeywordOptionFixture{
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"-a"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "-a",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-b",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-aa",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "a", removed_equal_prefix = false},
-        },
-        {
-          input = "-a=a",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "a", removed_equal_prefix = true},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"-a"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "-a", expected = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = nil, removed_equal_prefix = false}},
+        {input = "", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "-", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "--", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "-b", expected = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false, is_unknown = true}},
+        {input = "-aa", expected = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "a", removed_equal_prefix = false}},
+        {input = "-a=a", expected = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "a", removed_equal_prefix = true}},
       },
     },
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--a"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "--a",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-b",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--a=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = "3", removed_equal_prefix = true},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"--a"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "--a", expected = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = nil, removed_equal_prefix = false}},
+        {input = "", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "-", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "--", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "-b", expected = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false, is_unknown = true}},
+        {input = "--a=3", expected = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = "3", removed_equal_prefix = true}},
       },
     },
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"-aaa"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "-a",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-aa",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-aaa",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-aaaa",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = "a", removed_equal_prefix = false},
-        },
-        {
-          input = "",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-b",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"-aaa"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "-a", expected = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false}},
+        {input = "-aa", expected = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false}},
+        {input = "-aaa", expected = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false}},
+        {input = "-aaaa", expected = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = "a", removed_equal_prefix = false}},
+        {input = "", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "-", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "--", expected = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false}},
+        {input = "-b", expected = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false, is_unknown = true}},
       },
     },
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"-a"}}, {action = .Store, flags = []string{"-ab"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "-a",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-ab",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "ab", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-a=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "3", removed_equal_prefix = true},
-        },
-        {
-          input = "-ab=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "ab", trailer = "3", removed_equal_prefix = true},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"-a"}}, {action = .Store, flags = []string{"-ab"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "-a", expected = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = nil, removed_equal_prefix = false}},
+        {input = "-ab", expected = _FoundKeywordOption(string){flag_type = .Short, value = "ab", trailer = nil, removed_equal_prefix = false}},
+        {input = "-a=3", expected = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "3", removed_equal_prefix = true}},
+        {input = "-ab=3", expected = _FoundKeywordOption(string){flag_type = .Short, value = "ab", trailer = "3", removed_equal_prefix = true}},
       },
     },
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--a"}}, {action = .Store, flags = []string{"--ab"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "--a",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--ab",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "ab", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--a=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = "3", removed_equal_prefix = true},
-        },
-        {
-          input = "--ab=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "ab", trailer = "3", removed_equal_prefix = true},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"--a"}}, {action = .Store, flags = []string{"--ab"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "--a", expected = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = nil, removed_equal_prefix = false}},
+        {input = "--ab", expected = _FoundKeywordOption(string){flag_type = .Long, value = "ab", trailer = nil, removed_equal_prefix = false}},
+        {input = "--a=3", expected = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = "3", removed_equal_prefix = true}},
+        {input = "--ab=3", expected = _FoundKeywordOption(string){flag_type = .Long, value = "ab", trailer = "3", removed_equal_prefix = true}},
       },
     },
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--long1", "--long2", "--long3"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "--lon",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = nil, removed_equal_prefix = false},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"--long1", "--long2", "--long3"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "--lon", expected = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = nil, removed_equal_prefix = false}},
+        {input = "--lon=3", expected = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true}},
+        {input = "--long1=3", expected = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true}},
+        {input = "--long13", expected = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = false}},
+      },
+    },
+    {
+      make_arg_args = []AddArgumentArgs{{action = .Store, flags = []string{"--long1"}}, {action = .Store, flags = []string{"--long2"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "--lon", expected = _FoundKeywordOption(string){flag_type = .Long, value = "", trailer = nil, removed_equal_prefix = false, is_error = true}},
         {
           input = "--lon=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true},
+          expected = _FoundKeywordOption(string){flag_type = .Long, value = "", trailer = nil, removed_equal_prefix = false, is_error = true},
         },
-        {
-          input = "--long1=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true},
-        },
-        {
-          input = "--long13",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = false},
-        },
+        {input = "--long1=3", expected = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true}},
+        {input = "--long13", expected = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = false}},
       },
     },
     {
-      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--long1"}}, {action = .Store, flags = []string{"--long2"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "--lon",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--lon=3",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "--long1=3",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true},
-        },
-        {
-          input = "--long13",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = false},
-        },
-      },
-    },
-    {
-      make_arg_args = []MakeArgumentArgs{{action = .Count, flags = []string{"-v", "--verbose"}}, {action = .Count, flags = []string{"-c", "--count"}}},
-      tests = []FoundKeywordTest{
-        {
-          input = "--verb",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "verbose", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-v",
-          expected_ok = true,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "verbose", trailer = nil, removed_equal_prefix = false},
-        },
-        {
-          input = "-a",
-          expected_ok = false,
-          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
-        },
+      make_arg_args = []AddArgumentArgs{{action = .Count, flags = []string{"-v", "--verbose"}}, {action = .Count, flags = []string{"-c", "--count"}}},
+      tests = []DetermineKeywordOptionTest{
+        {input = "--verb", expected = _FoundKeywordOption(string){flag_type = .Long, value = "verbose", trailer = nil, removed_equal_prefix = false}},
+        {input = "-v", expected = _FoundKeywordOption(string){flag_type = .Short, value = "verbose", trailer = nil, removed_equal_prefix = false}},
+        {input = "-a", expected = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false, is_unknown = true}},
       },
     },
   }
 
   for alloc in allocs {
     fixture_loop: for fixture, fixture_idx in &fixtures {
-      ap, ap_ok := makeArgumentParser(add_help = fixture.add_help, allocator = alloc)
+      ap, ap_ok := makeArgumentParser(add_help = fixture.argparser_args.add_help, allocator = alloc)
       defer deleteArgumentParser(&ap)
       for arg_args in fixture.make_arg_args {
         opt, opt_ok := addArgument(self = &ap, flags = arg_args.flags, action = arg_args.action)
@@ -336,110 +182,45 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
         }
       }
       for test, test_idx in &fixture.tests {
-        out, ok := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap._prefix_rune, equality_rune = ap._equality_rune)
-        tc.expect(t, test.expected_ok == ok, fmt.tprintf("Test[%v][%v]: ok: Expected:%v  Got:%v", fixture_idx, test_idx, test.expected_ok, ok))
+        out := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap._prefix_rune, equality_rune = ap._equality_rune)
         tc.expect(
           t,
-          test.expected_out.flag_type == out.flag_type,
-          fmt.tprintf("Test[%v][%v]: flag: Expected:%v; Got:%v", fixture_idx, test_idx, test.expected_out.flag_type, out.flag_type),
+          test.expected.value == out.value,
+          fmt.tprintf("Test[%v][%v]: value: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.value, out.value),
         )
         tc.expect(
           t,
-          test.expected_out.value == out.value,
-          fmt.tprintf("Test[%v][%v]: value: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected_out.value, out.value),
+          (test.expected.trailer == out.trailer) || ((test.expected.trailer == nil) && (out.trailer == nil)),
+          fmt.tprintf("Test[%v][%v]: trailer: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.trailer, out.trailer),
         )
         tc.expect(
           t,
-          (test.expected_out.trailer == out.trailer) || ((test.expected_out.trailer == nil) && (out.trailer == nil)),
-          fmt.tprintf("Test[%v][%v]: trailer: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected_out.trailer, out.trailer),
+          (test.expected.is_unknown == out.is_unknown),
+          fmt.tprintf("Test[%v][%v]: is_unknown: Expected:%v; Got:%v", fixture_idx, test_idx, test.expected.is_unknown, out.is_unknown),
         )
         tc.expect(
           t,
-          test.expected_out.removed_equal_prefix == out.removed_equal_prefix,
+          (test.expected.is_error == out.is_error),
+          fmt.tprintf("Test[%v][%v]: is_error: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.is_error, out.is_error),
+        )
+        tc.expect(
+          t,
+          test.expected.removed_equal_prefix == out.removed_equal_prefix,
           fmt.tprintf(
             "Test[%v][%v]: removed_equal_prefix: Expected:%v; Got:%v",
             fixture_idx,
             test_idx,
-            test.expected_out.removed_equal_prefix,
+            test.expected.removed_equal_prefix,
             out.removed_equal_prefix,
           ),
         )
         tc.expect(
           t,
-          _isequal_FoundKeywordOption(&test.expected_out, &out),
-          fmt.tprintf("Test[%v][%v] input:%q:\nExpected:%v\nGot     :%v", fixture_idx, test_idx, test.input, test.expected_out, out),
+          _isequal_FoundKeywordOption(&test.expected, &out),
+          fmt.tprintf("Test[%v][%v] input:%q:\nExpected:%v\nGot     :%v", fixture_idx, test_idx, test.input, test.expected, out),
         )
       }
     }
-    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
-    //     expected := _FoundKeywordOption(string) {
-    //       arg                  = input,
-    //       flag_type            = .Long,
-    //       value                = "count",
-    //       trailer              = nil,
-    //       removed_equal_prefix = false,
-    //     }
-    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
-    //   }
-    //   {
-    //     input := "--coun=33"
-    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap._prefix_rune)
-    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
-    //     expected := _FoundKeywordOption(string) {
-    //       arg                  = input,
-    //       flag_type            = .Long,
-    //       value                = "count",
-    //       trailer              = "33",
-    //       removed_equal_prefix = true,
-    //     }
-    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
-    //   }
-    //   {
-    //     input := "-sh"
-    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap._prefix_rune)
-    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
-    //     expected := _FoundKeywordOption(string) {
-    //       arg                  = input,
-    //       flag_type            = .Short,
-    //       value                = "count",
-    //       trailer              = nil,
-    //       removed_equal_prefix = false,
-    //     }
-    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
-    //   }
-    //   {
-    //     input := "-sh=33"
-    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap._prefix_rune)
-    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
-    //     expected := _FoundKeywordOption(string) {
-    //       arg                  = input,
-    //       flag_type            = .Short,
-    //       value                = "count",
-    //       trailer              = "33",
-    //       removed_equal_prefix = true,
-    //     }
-    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
-    //   }
-    // }
-    // /*
-    //   ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
-    //   defer deleteArgumentParser(&ap)
-    //   tc.expect(t, ap_ok)
-    //   addArgument(&ap, {"--abc0"})
-    //   addArgument(&ap, {"--abc1"})
-    //   addArgument(&ap, {"--abc2"})
-    //   addArgument(&ap, {"--abbrieviation", "--abby"})
-    //   fuko := _getUnambiguousKeywordOption(&ap, "--abc0")
-    //   tc.expect(t, fuko.option != nil)
-    //   fuko = _getUnambiguousKeywordOption(&ap, "--abc")
-    //   tc.expect(t, fuko.option == nil)
-    //   fuko = _getUnambiguousKeywordOption(&ap, "--abbriev")
-    //   tc.expect(t, fuko.option != nil)
-    //   tc.expect(t, len(fuko.arg) <= len(fuko.keyword))
-    //   fuko = _getUnambiguousKeywordOption(&ap, "--abbrieviation")
-    //   tc.expect(t, fuko.option != nil)
-    //   tc.expect(t, len(fuko.arg) == len(fuko.keyword))
-    // */
   }
 }
 

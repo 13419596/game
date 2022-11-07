@@ -9,11 +9,12 @@ import "core:unicode/utf8"
 import "game:trie"
 
 _FoundKeywordOption :: struct($V: typeid) {
-  // arg:                  string,
   flag_type:            _ArgumentFlagType,
   value:                V,
   trailer:              Maybe(string),
   removed_equal_prefix: bool,
+  is_unknown:           bool, // unknown but not a hard error
+  is_error:             bool, // ambiguous result, a hard error
 }
 
 _isequal_FoundKeywordOption :: proc(lhs: $T1/^_FoundKeywordOption($V), rhs: $T2/^_FoundKeywordOption(V)) -> bool {
@@ -26,7 +27,10 @@ _isequal_FoundKeywordOption :: proc(lhs: $T1/^_FoundKeywordOption($V), rhs: $T2/
     ((lhs.flag_type == rhs.flag_type) &&
       (lhs.value == rhs.value) &&
       ((lhs.trailer == rhs.trailer) || (lhs.trailer == nil && rhs.trailer == nil)) &&
-      (lhs.removed_equal_prefix == rhs.removed_equal_prefix))
+      (lhs.removed_equal_prefix == rhs.removed_equal_prefix) &&
+      (lhs.is_unknown == rhs.is_unknown) &&
+      (lhs.is_error == rhs.is_error)
+    )
   return out
 }
 
@@ -77,20 +81,20 @@ _determineKeywordOption :: proc(
   arg: string,
   prefix_rune: rune,
   equality_rune: rune,
-) -> (
-  out: _FoundKeywordOption(V),
-  ok: bool,
-) {
+) -> _FoundKeywordOption(V) {
   // Get parts of a keyword option if it is in the trie.
   // - keyword options can be abbreviated if unambiguous
   // - multiple options can match only if there is an exacdt match or an exact prefix match with an =
   using strings
   using trie
   context.allocator = context.temp_allocator
-  ok = false
   clean_arg := _cleanFlag(arg, prefix_rune) // temp allocate
-  out.flag_type = _getFlagType(clean_arg, prefix_rune)
-  out.removed_equal_prefix = false
+  out := _FoundKeywordOption(V){
+    flag_type = _getFlagType(clean_arg, prefix_rune),
+    is_unknown=false,
+    is_error=false,
+    removed_equal_prefix = false
+  }
 
   arg_prefix_len := 0
   switch out.flag_type {
@@ -99,8 +103,7 @@ _determineKeywordOption :: proc(
     fallthrough
   case .Invalid:
     log.debugf("%q is not a keyword argument. Got flag type:%v", arg, out.flag_type)
-    ok = false
-    return
+    return out
   ///////
   case .Short:
     arg_prefix_len = utf8.rune_size(prefix_rune)
@@ -113,13 +116,13 @@ _determineKeywordOption :: proc(
   if len_longest_prefix_key := len(longest_prefix_key); len_longest_prefix_key == 0 {
     // not in trie
     log.debugf("%q did not match any arguments.", arg)
-    ok = false
-    return
+    out.is_unknown = true
+    return out
   } else if len_longest_prefix_key <= arg_prefix_len {
     // Check that longest prefix match is at least longer than the keyword flag prefix
     log.debugf("%q, flag type %v, did not match any arguments.", arg, out.flag_type)
-    ok = false
-    return
+    out.is_unknown = true
+    return out
   }
 
   // Now confirm that longest prefix is unambiguous, either:
@@ -130,8 +133,8 @@ _determineKeywordOption :: proc(
   if len(kvs_with_prefix) == 0 {
     // invalid state, should not happen
     log.warnf("Found longest prefix:%q, but no values were found with this prefix. This is odd", longest_prefix_key, kvs_with_prefix)
-    ok = false
-    return
+    out.is_unknown = true
+    return out
   }
   {
     // see if there is 1 kv or all kv's point to same dest. 
@@ -150,8 +153,7 @@ _determineKeywordOption :: proc(
       out.value = kv.value
       matched_option := concatenate({longest_prefix_key, _stringFromRunes(kv.key[:])[:]}) // temp allocate
       out.trailer, out.removed_equal_prefix = _removeEqualityPrefix(_getOptionTrailer(clean_arg, matched_option), equality_rune)
-      ok = true
-      return
+      return out
     }
   }
 
@@ -173,8 +175,8 @@ _determineKeywordOption :: proc(
     // no exact matches or arg= matches, log message about all possible matches
     sort.quick_sort(matched_options[:])
     log.errorf("Ambiguous option: %q could match %v", arg, matched_options)
-    ok = false
-    return
+    out.is_error = true
+    return out
   } else if num_kv_idx_matches > 1 {
     // multiple matches, but could still be unambiguous if all kvs point to same dest
     dest := kvs_with_prefix[kv_idx_matches[0]].value
@@ -193,8 +195,8 @@ _determineKeywordOption :: proc(
       }
       sort.quick_sort(specific_matched_options[:])
       log.errorf("Ambiguous option: %q could match %v", arg, specific_matched_options)
-      ok = false
-      return
+      out.is_error = true
+      return out
     }
   }
 
@@ -203,8 +205,7 @@ _determineKeywordOption :: proc(
   out.value = kv.value
   matched_option := concatenate({longest_prefix_key, _stringFromRunes(kv.key[:])[:]}) // temp allocate
   out.trailer, out.removed_equal_prefix = _removeEqualityPrefix(_getOptionTrailer(clean_arg, matched_option), equality_rune)
-  ok = true
-  return
+  return out
 }
 
 ////////////////////////////////////////////////////////////////

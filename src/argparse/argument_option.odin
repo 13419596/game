@@ -20,14 +20,14 @@ ArgumentOption :: struct {
 }
 
 @(require_results)
-makeArgumentOption :: proc(
+_makeArgumentOption :: proc(
   flags: []string,
+  prefix: rune,
   dest: Maybe(string) = nil,
   nargs := NargsType{},
   action := ArgumentAction.Store,
   required := Maybe(bool){},
   help: Maybe(string) = nil,
-  prefix := _DEFAULT_PREFIX_RUNE,
   allocator := context.allocator,
 ) -> (
   out: ArgumentOption,
@@ -43,7 +43,7 @@ makeArgumentOption :: proc(
     flags      = _cleanFlags(flags, prefix, allocator),
     _allocator = allocator,
   }
-  out._is_positional = _isPositionalFlag(out.flags[0])
+  out._is_positional = _isPositionalFlag(flag = out.flags[0], prefix = prefix)
   if num_tokens, num_tokens_ok := _parseNargs(out.action, nargs); num_tokens_ok {
     out.num_tokens = num_tokens
   } else {
@@ -128,8 +128,8 @@ _clearCache :: proc(self: $T/^ArgumentOption) {
 _makeUsageString :: proc(
   self: $T/^ArgumentOption,
   flag: string,
+  prefix: rune,
   disable_keyword_brackets: bool = false,
-  prefix := _DEFAULT_PREFIX_RUNE,
   allocator := context.allocator,
 ) -> string {
   using strings
@@ -188,7 +188,7 @@ _makeUsageString :: proc(
   return out
 }
 
-_getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE) -> string {
+_getUsageString :: proc(self: $T/^ArgumentOption, prefix: rune) -> string {
   if usage, ok := self._cache_usage.?; ok {
     return usage
   }
@@ -198,7 +198,7 @@ _getUsageString :: proc(self: $T/^ArgumentOption, prefix := _DEFAULT_PREFIX_RUNE
   return out
 }
 
-_getHelpCache :: proc(self: $T/^ArgumentOption, indent := "  ", flag_field_width: int = 22, prefix := _DEFAULT_PREFIX_RUNE) -> string {
+_getHelpCache :: proc(self: $T/^ArgumentOption, prefix: rune, indent := "  ", flag_field_width: int = 22) -> string {
   if help_cache, ok := self._cache_help.?; ok {
     return help_cache
   }
