@@ -8,12 +8,6 @@ import "core:strings"
 import "core:unicode/utf8"
 import "game:trie"
 
-@(private = "file")
-_FLAG_EQUALITY_STRING := fmt.aprintf("%v", _DEFAULT_EQUALITY_RUNE)
-
-@(private = "file")
-_FLAG_EQUALITY_LENGTH := len(fmt.tprintf("%v", _DEFAULT_EQUALITY_RUNE))
-
 _FoundKeywordOption :: struct($V: typeid) {
   // arg:                  string,
   flag_type:            _ArgumentFlagType,
