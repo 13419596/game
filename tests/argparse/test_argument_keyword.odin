@@ -5,215 +5,26 @@ package test_argparse
 import "core:fmt"
 import "core:log"
 import "core:runtime"
+import "core:strings"
 import "core:testing"
 import "game:argparse"
+import "game:trie"
 import tc "tests:common"
 
 
 @(test)
 test_ArgParse_Keyword :: proc(t: ^testing.T) {
-  test_determineKeywordOption(t)
   test_makeOptionProcessingState(t)
+  test_determineKeywordOption(t)
   test_processKeywordOption(t)
 }
 
-@(test)
-test_determineKeywordOption :: proc(t: ^testing.T) {
-  using argparse
-  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
-  for alloc in allocs {
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"-a"})
-      input := "-a"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      tc.expect(t, ok, "Expected ok")
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Short,
-        value                = "a",
-        head                 = "-a",
-        tail                 = nil,
-        removed_equal_prefix = false,
-      }
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"-a"})
-      input := "-a=0"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Short,
-        value                = "a",
-        head                 = "-a",
-        tail                 = "0",
-        removed_equal_prefix = true,
-      }
-      tc.expect(t, ok, "Expected ok")
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"-a"})
-      input := "-a77"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Short,
-        value                = "a",
-        head                 = "-a",
-        tail                 = "77",
-        removed_equal_prefix = false,
-      }
-      tc.expect(t, ok, "Expected ok")
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"-a"})
-      addArgument(self = &ap, flags = {"-ab"})
-      input := "-a"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      tc.expect(t, ok, "Expected ok")
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Short,
-        value                = "a",
-        head                 = input,
-        tail                 = nil,
-        removed_equal_prefix = false,
-      }
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    if false {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"-a"})
-      addArgument(self = &ap, flags = {"-ab"})
-      input := "-a=9"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      tc.expect(t, ok, fmt.tprintf("Expected ok"))
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Short,
-        value                = "a",
-        head                 = "-a",
-        tail                 = "9",
-        removed_equal_prefix = true,
-      }
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    ////////
-    // Long flags
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"--a"})
-      input := "--a"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      tc.expect(t, ok, "Expected ok")
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Long,
-        value                = "a",
-        head                 = "--a",
-        tail                 = nil,
-        removed_equal_prefix = false,
-      }
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"--a"})
-      input := "--a=0"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Long,
-        value                = "a",
-        head                 = "--a",
-        tail                 = "0",
-        removed_equal_prefix = true,
-      }
-      tc.expect(t, ok, "Expected ok")
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"--a"})
-      input := "--a77"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Long,
-        value                = "a",
-        head                 = "--a",
-        tail                 = "77",
-        removed_equal_prefix = false,
-      }
-      tc.expect(t, ok, "Expected ok")
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"--a"})
-      addArgument(self = &ap, flags = {"-ab"})
-      input := "--a"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      tc.expect(t, ok, "Expected ok")
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Long,
-        value                = "a",
-        head                 = input,
-        tail                 = nil,
-        removed_equal_prefix = false,
-      }
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-    {
-      ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
-      defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(self = &ap, flags = {"--a"})
-      addArgument(self = &ap, flags = {"-ab"})
-      input := "--a=9"
-      output, ok := _determineKeywordOption(&ap._kw_trie, input)
-      tc.expect(t, ok, fmt.tprintf("Expected ok"))
-      expected := _FoundKeywordOption(string) {
-        arg                  = input,
-        flag_type            = .Long,
-        value                = "a",
-        head                 = "--a",
-        tail                 = "9",
-        removed_equal_prefix = true,
-      }
-      tc.expect(t, _isequal_FoundKeywordOption(&output, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-    }
-  }
-}
+//////////////////////////////////////////////////////////////////
 
 @(test)
 test_makeOptionProcessingState :: proc(t: ^testing.T) {
   using argparse
+  using strings
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   num_tokens := []_NumTokens{_NumTokens{}, _NumTokens{0, nil}, _NumTokens{1, nil}}
   for alloc in allocs {
@@ -224,16 +35,17 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
         case bool:
         case int:
         case string:
+          data = clone("asdf", alloc)
         case [dynamic]string:
-          append(&data, "string data")
-          append(&data, "string data")
-          append(&data, "string data")
+          append(&data, clone("string data", alloc))
+          append(&data, clone("string data", alloc))
+          append(&data, clone("string data", alloc))
         case [dynamic][dynamic]string:
-          vals := make([dynamic]string, 1)
-          vals[0] = "data"
+          vals := make([dynamic]string, 1, alloc)
+          vals[0] = clone("data00", alloc)
           append(&data, vals)
-          vals = make([dynamic]string, 1)
-          vals[0] = "data"
+          vals = make([dynamic]string, 1, alloc)
+          vals[0] = clone("data11", alloc)
           append(&data, vals)
         }
         _deleteOptionProcessingState(&state)
@@ -243,6 +55,395 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
   }
 }
 
+//////////////////////////////////////////////////////////////////
+
+@(private = "file")
+MakeArgumentArgs :: struct {
+  action: argparse.ArgumentAction,
+  flags:  []string,
+}
+
+@(private = "file")
+FoundKeywordTest :: struct {
+  input:        string,
+  expected_ok:  bool,
+  expected_out: argparse._FoundKeywordOption(string),
+}
+
+@(private = "file")
+TestFixture :: struct {
+  add_help:      bool,
+  make_arg_args: []MakeArgumentArgs,
+  tests:         []FoundKeywordTest,
+}
+
+@(test)
+test_determineKeywordOption :: proc(t: ^testing.T) {
+  using argparse
+  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  fixtures := []TestFixture{
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"-a"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "-a",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-b",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-aa",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "a", removed_equal_prefix = false},
+        },
+        {
+          input = "-a=a",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "a", removed_equal_prefix = true},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--a"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "--a",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-b",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--a=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = "3", removed_equal_prefix = true},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"-aaa"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "-a",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-aa",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-aaa",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-aaaa",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "aaa", trailer = "a", removed_equal_prefix = false},
+        },
+        {
+          input = "",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Invalid, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-b",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"-a"}}, {action = .Store, flags = []string{"-ab"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "-a",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-ab",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "ab", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-a=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "a", trailer = "3", removed_equal_prefix = true},
+        },
+        {
+          input = "-ab=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "ab", trailer = "3", removed_equal_prefix = true},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--a"}}, {action = .Store, flags = []string{"--ab"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "--a",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--ab",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "ab", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--a=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "a", trailer = "3", removed_equal_prefix = true},
+        },
+        {
+          input = "--ab=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "ab", trailer = "3", removed_equal_prefix = true},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--long1", "--long2", "--long3"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "--lon",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--lon=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true},
+        },
+        {
+          input = "--long1=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true},
+        },
+        {
+          input = "--long13",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = false},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Store, flags = []string{"--long1"}}, {action = .Store, flags = []string{"--long2"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "--lon",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--lon=3",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "--long1=3",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = true},
+        },
+        {
+          input = "--long13",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "long1", trailer = "3", removed_equal_prefix = false},
+        },
+      },
+    },
+    {
+      make_arg_args = []MakeArgumentArgs{{action = .Count, flags = []string{"-v", "--verbose"}}, {action = .Count, flags = []string{"-c", "--count"}}},
+      tests = []FoundKeywordTest{
+        {
+          input = "--verb",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Long, value = "verbose", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-v",
+          expected_ok = true,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "verbose", trailer = nil, removed_equal_prefix = false},
+        },
+        {
+          input = "-a",
+          expected_ok = false,
+          expected_out = _FoundKeywordOption(string){flag_type = .Short, value = "", trailer = nil, removed_equal_prefix = false},
+        },
+      },
+    },
+  }
+
+  for alloc in allocs {
+    fixture_loop: for fixture, fixture_idx in &fixtures {
+      ap, ap_ok := makeArgumentParser(add_help = fixture.add_help, allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      for arg_args in fixture.make_arg_args {
+        opt, opt_ok := addArgument(self = &ap, flags = arg_args.flags, action = arg_args.action)
+        tc.expect(t, opt_ok)
+        if !opt_ok {
+          continue fixture_loop
+        }
+      }
+      for test, test_idx in &fixture.tests {
+        out, ok := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap.prefix_rune, equality_rune = ap.equality_rune)
+        tc.expect(t, test.expected_ok == ok, fmt.tprintf("Test[%v][%v]: ok: Expected:%v  Got:%v", fixture_idx, test_idx, test.expected_ok, ok))
+        tc.expect(
+          t,
+          test.expected_out.flag_type == out.flag_type,
+          fmt.tprintf("Test[%v][%v]: flag: Expected:%v; Got:%v", fixture_idx, test_idx, test.expected_out.flag_type, out.flag_type),
+        )
+        tc.expect(
+          t,
+          test.expected_out.value == out.value,
+          fmt.tprintf("Test[%v][%v]: value: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected_out.value, out.value),
+        )
+        tc.expect(
+          t,
+          (test.expected_out.trailer == out.trailer) || ((test.expected_out.trailer == nil) && (out.trailer == nil)),
+          fmt.tprintf("Test[%v][%v]: trailer: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected_out.trailer, out.trailer),
+        )
+        tc.expect(
+          t,
+          test.expected_out.removed_equal_prefix == out.removed_equal_prefix,
+          fmt.tprintf(
+            "Test[%v][%v]: removed_equal_prefix: Expected:%v; Got:%v",
+            fixture_idx,
+            test_idx,
+            test.expected_out.removed_equal_prefix,
+            out.removed_equal_prefix,
+          ),
+        )
+        tc.expect(
+          t,
+          _isequal_FoundKeywordOption(&test.expected_out, &out),
+          fmt.tprintf("Test[%v][%v] input:%q:\nExpected:%v\nGot     :%v", fixture_idx, test_idx, test.input, test.expected_out, out),
+        )
+      }
+    }
+    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
+    //     expected := _FoundKeywordOption(string) {
+    //       arg                  = input,
+    //       flag_type            = .Long,
+    //       value                = "count",
+    //       trailer              = nil,
+    //       removed_equal_prefix = false,
+    //     }
+    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
+    //   }
+    //   {
+    //     input := "--coun=33"
+    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap.prefix_rune)
+    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
+    //     expected := _FoundKeywordOption(string) {
+    //       arg                  = input,
+    //       flag_type            = .Long,
+    //       value                = "count",
+    //       trailer              = "33",
+    //       removed_equal_prefix = true,
+    //     }
+    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
+    //   }
+    //   {
+    //     input := "-sh"
+    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap.prefix_rune)
+    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
+    //     expected := _FoundKeywordOption(string) {
+    //       arg                  = input,
+    //       flag_type            = .Short,
+    //       value                = "count",
+    //       trailer              = nil,
+    //       removed_equal_prefix = false,
+    //     }
+    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
+    //   }
+    //   {
+    //     input := "-sh=33"
+    //     out, ok := _determineKeywordOption(&ap._kw_trie, input, ap.prefix_rune)
+    //     tc.expect(t, ok, fmt.tprintf("Expected ok"))
+    //     expected := _FoundKeywordOption(string) {
+    //       arg                  = input,
+    //       flag_type            = .Short,
+    //       value                = "count",
+    //       trailer              = "33",
+    //       removed_equal_prefix = true,
+    //     }
+    //     tc.expect(t, _isequal_FoundKeywordOption(&out, &expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, out))
+    //   }
+    // }
+    // /*
+    //   ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
+    //   defer deleteArgumentParser(&ap)
+    //   tc.expect(t, ap_ok)
+    //   addArgument(&ap, {"--abc0"})
+    //   addArgument(&ap, {"--abc1"})
+    //   addArgument(&ap, {"--abc2"})
+    //   addArgument(&ap, {"--abbrieviation", "--abby"})
+    //   fuko := _getUnambiguousKeywordOption(&ap, "--abc0")
+    //   tc.expect(t, fuko.option != nil)
+    //   fuko = _getUnambiguousKeywordOption(&ap, "--abc")
+    //   tc.expect(t, fuko.option == nil)
+    //   fuko = _getUnambiguousKeywordOption(&ap, "--abbriev")
+    //   tc.expect(t, fuko.option != nil)
+    //   tc.expect(t, len(fuko.arg) <= len(fuko.keyword))
+    //   fuko = _getUnambiguousKeywordOption(&ap, "--abbrieviation")
+    //   tc.expect(t, fuko.option != nil)
+    //   tc.expect(t, len(fuko.arg) == len(fuko.keyword))
+    // */
+  }
+}
+
+//////////////////////////////////////////////////////////////////
 
 @(test)
 test_processKeywordOption :: proc(t: ^testing.T) {

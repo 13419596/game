@@ -15,7 +15,6 @@ test_ArgumentFlags :: proc(t: ^testing.T) {
   test_isPositionalFlag(t)
   test_getFlagType(t)
   test_getDestFromFlags(t)
-  test_getShortFlagParts(t)
 }
 
 @(test)
@@ -100,30 +99,3 @@ test_getDestFromFlags :: proc(t: ^testing.T) {
 }
 
 //////////////////////////////////////
-
-@(test)
-test_getShortFlagParts :: proc(t: ^testing.T) {
-  using argparse
-  {
-    input := "-ab"
-    expected := _ShortFlagParts {
-      arg                 = input,
-      flag_with_prefix    = "-a",
-      flag_without_prefix = "a",
-      tail                = "b",
-    }
-    output := _getShortFlagParts(input, '-')
-    tc.expect(t, expected == output, fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-  }
-  {
-    input := "-ä0123456789"
-    expected := _ShortFlagParts {
-      arg                 = input,
-      flag_with_prefix    = "-ä",
-      flag_without_prefix = "ä",
-      tail                = "0123456789",
-    }
-    output := _getShortFlagParts(input, '-')
-    tc.expect(t, expected == output, fmt.tprintf("\nExpected:%v\n     Got:%v", expected, output))
-  }
-}

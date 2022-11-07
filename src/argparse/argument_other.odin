@@ -1,23 +1,25 @@
 package argparse
 
 import "core:fmt"
+import "core:intrinsics"
 import "core:strings"
 
 @(require_results)
-_runesFromString :: proc(s: string, allocator := context.allocator) -> []rune {
+_runesFromString :: proc(s: string, allocator := context.allocator) -> [dynamic]rune {
   out := make([dynamic]rune, allocator)
   for rn in s {
     append(&out, rn)
   }
-  return out[:]
+  return out
 }
 
 @(require_results)
-_stringFromRunes :: proc(runes: []rune, allocator := context.allocator) -> string {
+_stringFromRunes :: proc(runes: []$T, allocator := context.allocator) -> string where ((intrinsics.type_is_integer(T) && size_of(T) >= 4) ||
+    intrinsics.type_is_rune(T)) {
   using strings
   tmp := make([dynamic]string, len(runes), context.temp_allocator)
   for rn in runes {
-    append(&tmp, fmt.tprintf("%v", rn))
+    append(&tmp, fmt.tprintf("%v", rune(rn)))
   }
   out := join(tmp[:], "", allocator)
   return out
@@ -36,7 +38,7 @@ _normalizePrefix :: proc(s: string, old: union #no_nil {
   case []rune:
     old_runes = val
   case string:
-    old_runes = _runesFromString(val)
+    old_runes = _runesFromString(val)[:]
   }
   tail_start_idx := -1
   prefix_rn_count := 0

@@ -56,15 +56,13 @@ test_runesFromString :: proc(t: ^testing.T) {
       input := "rün"
       expected := []rune{'r', 'ü', 'n'}
       output := _runesFromString(input[:], alloc)
-      tc.expect(t, isequal_slice(expected, output), fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
-      defer delete(output, alloc)
+      tc.expect(t, isequal_slice(expected, output[:]), fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
     }
     {
       input := ""
       expected := []rune{}
       output := _runesFromString(input[:], alloc)
-      tc.expect(t, isequal_slice(expected, output), fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
-      defer delete(output, alloc)
+      tc.expect(t, isequal_slice(expected, output[:]), fmt.tprintf("\nExpected:%q\n     Out:%q", expected, output))
     }
   }
 }

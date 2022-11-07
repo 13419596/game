@@ -15,7 +15,7 @@ test_ArgumentParser :: proc(t: ^testing.T) {
   test_addArgument(t)
   test_getUsage(t)
   test_getHelp(t)
-  // test_getUnambiguousKeywordOption(t)
+  test_parseKnownArgs(t)
 }
 
 @(test)
@@ -112,32 +112,53 @@ test_getHelp :: proc(t: ^testing.T) {
 }
 
 /////////////////////////////////////////
-/*
 @(test)
-test_getUnambiguousKeywordOption :: proc(t: ^testing.T) {
+test_parseKnownArgs :: proc(t: ^testing.T) {
   using argparse
-  allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
+  allocs := []runtime.Allocator{context.allocator} //context.temp_allocator}
   for alloc in allocs {
+    if false {
+      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      out, ok := parseKnownArgs(&ap, {"-h"})
+      defer deleteParsedOutput(&out)
+      tc.expect(t, ok)
+      tc.expect(t, out.should_quit)
+    }
+    if false {
+      ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
+      defer deleteArgumentParser(&ap)
+      option, opt_ok := addArgument(self = &ap, action = .Version, flags = {"--version"})
+      {
+        out, ok := parseKnownArgs(&ap, {"--version"})
+        defer deleteParsedOutput(&out)
+        tc.expect(t, ok)
+        tc.expect(t, out.should_quit)
+        tc.expect(t, len(out.unknown) == 0)
+      }
+      {
+        out, ok := parseKnownArgs(&ap, {"-version"})
+        defer deleteParsedOutput(&out)
+        tc.expect(t, ok)
+        tc.expect(t, !out.should_quit)
+        tc.expect(t, len(out.unknown) == 1)
+      }
+    }
     {
       ap, ap_ok := makeArgumentParser(prog = "PROG", description = "description", epilog = "EPILOG", allocator = alloc)
       defer deleteArgumentParser(&ap)
-      tc.expect(t, ap_ok)
-      addArgument(&ap, {"--abc0"})
-      addArgument(&ap, {"--abc1"})
-      addArgument(&ap, {"--abc2"})
-      addArgument(&ap, {"--abbrieviation", "--abby"})
-      fuko := _getUnambiguousKeywordOption(&ap, "--abc0")
-      tc.expect(t, fuko.option != nil)
-      fuko = _getUnambiguousKeywordOption(&ap, "--abc")
-      tc.expect(t, fuko.option == nil)
-      fuko = _getUnambiguousKeywordOption(&ap, "--abbriev")
-      tc.expect(t, fuko.option != nil)
-      tc.expect(t, len(fuko.arg) <= len(fuko.keyword))
-      fuko = _getUnambiguousKeywordOption(&ap, "--abbrieviation")
-      tc.expect(t, fuko.option != nil)
-      tc.expect(t, len(fuko.arg) == len(fuko.keyword))
+      option, opt_ok := addArgument(self = &ap, action = .Count, flags = {"-c", "--count"})
+      tc.expect(t, opt_ok)
+      {
+        out, ok := parseKnownArgs(&ap, {"-c", "--count", "--cou"})
+        defer deleteParsedOutput(&out)
+        tc.expect(t, ok)
+        tc.expect(t, !out.should_quit)
+        tc.expect(t, len(out.unknown) == 0, fmt.tprintf("Expected no unknown. Got:%v", out.unknown))
+        count, count_ok := out.data["count"].(int)
+        tc.expect(t, count_ok)
+        tc.expect(t, count == 3, fmt.tprintf("Expected: 3; Got:%v", count))
+      }
     }
   }
 }
-
-*/

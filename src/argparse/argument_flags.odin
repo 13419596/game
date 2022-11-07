@@ -70,64 +70,22 @@ _getFlagType :: proc(flag: string, prefix := _DEFAULT_PREFIX_RUNE) -> _ArgumentF
 
 /////////////////////////////
 
-_ShortFlagParts :: struct {
-  arg:                 string,
-  flag_without_prefix: string,
-  flag_with_prefix:    string,
-  tail:                string,
+@(require_results)
+_cleanFlag :: proc(raw_flag: string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> string {
+  context.allocator = allocator
+  out := _normalizePrefix(s = raw_flag, old = []rune{prefix}, replacement = prefix)
+  return out
 }
-
-_getShortFlagParts :: proc(arg: string, prefix := _DEFAULT_PREFIX_RUNE) -> (out: _ShortFlagParts, ok: bool) #optional_ok {
-  // returns slices of arg, does not allocate
-  out.arg = arg
-  flag_start_idx := -1 // string slice index for start of flag
-  // -a -> 1
-  // -äb -> 1
-  tail_start_idx := -1 // string slice index for start of trail e.g. -ab -> 2  
-  // -a -> 2
-  // -äb -> 3
-  rn_idx := 0 // rune count index
-  loop: for rn, idx in arg {
-    switch rn_idx {
-    case 0:
-      if rn != prefix {
-        //invalid
-        ok = false
-        break loop
-      }
-    case 1:
-      if rn == prefix {
-        // invalid
-        ok = false
-        break loop
-      }
-      flag_start_idx = idx
-    case 2:
-      tail_start_idx = idx
-      ok = true
-      break loop
-    }
-    rn_idx += 1
-  }
-  if ok {
-    out.flag_with_prefix = arg[:tail_start_idx]
-    out.flag_without_prefix = arg[flag_start_idx:tail_start_idx]
-    out.tail = arg[tail_start_idx:]
-  }
-  return
-}
-
-/////////////////////////////
 
 @(require_results)
-_cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> []string {
+_cleanFlags :: proc(raw_flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE, allocator := context.allocator) -> [dynamic]string {
   // Cleans all flag prefixes
   context.allocator = allocator
   flags := make([dynamic]string, len(raw_flags))
   for raw_flag, idx in raw_flags {
-    flags[idx] = _normalizePrefix(s = raw_flag, old = []rune{prefix}, replacement = prefix)
+    flags[idx] = _cleanFlag(raw_flag, prefix)
   }
-  return flags[:]
+  return flags
 }
 
 /////////////////////////////
@@ -139,7 +97,7 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) 
   out = ""
   ok = false
   if len(flags) <= 0 {
-    log.errorf("Option strings is empty. Expected at least one flag string.")
+    log.errorf("Option strings array is empty. Expected at least one flag string.")
     return
   }
   long_flag_index := -1
@@ -159,7 +117,7 @@ _getDestFromFlags :: proc(flags: []string, prefix: rune = _DEFAULT_PREFIX_RUNE) 
     }
   }
   if first_non_prefix_index == -1 {
-    log.errorf("Could not determine first non-prefix index in flag:%q", flag)
+    log.errorf("Could not determine first non-prefix index in flags array:%v", flags)
     return
   }
   out = flag[first_non_prefix_index:]

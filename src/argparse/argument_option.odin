@@ -6,18 +6,17 @@ import "core:runtime"
 import "core:strings"
 
 ArgumentOption :: struct {
-  flags:          []string,
+  flags:          [dynamic]string, // list wont change length, but [dyanmic] is nice because it remembers allocator
   dest:           string,
   const:          any,
   action:         ArgumentAction,
   required:       bool,
   help:           string,
   num_tokens:     _NumTokens,
-  _allocator:     runtime.Allocator,
   _is_positional: bool,
-  _is_composed:   bool, // multipart
   _cache_usage:   Maybe(string),
   _cache_help:    Maybe(string),
+  _allocator:     runtime.Allocator,
 }
 
 @(require_results)
@@ -60,7 +59,7 @@ makeArgumentOption :: proc(
   if dest_string, mdest_ok := dest.?; mdest_ok {
     out.dest = dest_string
   } else {
-    if dest, dest_ok := _getDestFromFlags(out.flags, prefix); dest_ok {
+    if dest, dest_ok := _getDestFromFlags(out.flags[:], prefix); dest_ok {
       out.dest = dest
     } else {
       ok = false
@@ -98,7 +97,7 @@ deleteArgumentOption :: proc(self: $T/^ArgumentOption) {
   for _, idx in self.flags {
     delete(self.flags[idx], self._allocator)
   }
-  delete(self.flags, self._allocator)
+  delete(self.flags)
   self.flags = {}
   self.dest = ""
   delete(self.help, self._allocator)
