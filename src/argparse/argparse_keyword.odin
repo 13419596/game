@@ -29,8 +29,7 @@ _isequal_FoundKeywordOption :: proc(lhs: $T1/^_FoundKeywordOption($V), rhs: $T2/
       ((lhs.trailer == rhs.trailer) || (lhs.trailer == nil && rhs.trailer == nil)) &&
       (lhs.removed_equal_prefix == rhs.removed_equal_prefix) &&
       (lhs.is_unknown == rhs.is_unknown) &&
-      (lhs.is_error == rhs.is_error)
-    )
+      (lhs.is_error == rhs.is_error))
   return out
 }
 
@@ -76,12 +75,7 @@ _removeEqualityPrefix :: proc(trailer: Maybe(string), equal_rune: rune) -> (out:
   return
 }
 
-_determineKeywordOption :: proc(
-  kw_trie: $T/^trie.Trie(int, $V),
-  arg: string,
-  prefix_rune: rune,
-  equality_rune: rune,
-) -> _FoundKeywordOption(V) {
+_determineKeywordOption :: proc(kw_trie: $T/^trie.Trie(int, $V), arg: string, prefix_rune: rune, equality_rune: rune) -> _FoundKeywordOption(V) {
   // Get parts of a keyword option if it is in the trie.
   // - keyword options can be abbreviated if unambiguous
   // - multiple options can match only if there is an exacdt match or an exact prefix match with an =
@@ -89,11 +83,11 @@ _determineKeywordOption :: proc(
   using trie
   context.allocator = context.temp_allocator
   clean_arg := _cleanFlag(arg, prefix_rune) // temp allocate
-  out := _FoundKeywordOption(V){
-    flag_type = _getFlagType(clean_arg, prefix_rune),
-    is_unknown=false,
-    is_error=false,
-    removed_equal_prefix = false
+  out := _FoundKeywordOption(V) {
+    flag_type            = _getFlagType(clean_arg, prefix_rune),
+    is_unknown           = false,
+    is_error             = false,
+    removed_equal_prefix = false,
   }
 
   arg_prefix_len := 0
