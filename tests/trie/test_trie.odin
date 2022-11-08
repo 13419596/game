@@ -6,10 +6,23 @@ import "core:fmt"
 import "core:log"
 import "core:mem"
 import "core:runtime"
+import "core:sort"
 import "core:testing"
 import "game:trie"
-import set "game:container/set"
 import tc "tests:common"
+
+@(private = "file")
+isEqualSlice :: proc(lhs: $T1/[]$S, rhs: $T2/[]S) -> bool {
+  if len(lhs) != len(rhs) {
+    return false
+  }
+  for lv, idx in lhs {
+    if lv != rhs[idx] {
+      return false
+    }
+  }
+  return true
+}
 
 @(test)
 test_Trie :: proc(t: ^testing.T) {
@@ -284,12 +297,12 @@ test_getAllWithPrefix :: proc(t: ^testing.T) {
       {
         prefix := "--test"
         {
-          expected_values := set.fromArray([]int{0, 1, 2})
-          defer set.deleteSet(&expected_values)
-          expected_keys := set.fromArray([]string{"--test", "--test1", "--test2"})
-          defer set.deleteSet(&expected_keys)
-          values := set.fromArray(getAllValuesWithPrefix(&tr, prefix, context.temp_allocator))
-          defer set.deleteSet(&values)
+          expected_values := []int{0, 1, 2}
+          sort.quick_sort(expected_values)
+          expected_keys := []string{"--test", "--test1", "--test2"}
+          sort.quick_sort(expected_keys)
+          values := getAllValuesWithPrefix(&tr, prefix, context.temp_allocator)
+          sort.quick_sort(values)
           keys := getAllKeysWithPrefix(&tr, prefix)
           defer {
             for k in keys {
@@ -304,20 +317,21 @@ test_getAllWithPrefix :: proc(t: ^testing.T) {
             }
             delete(kvs)
           }
-          tc.expect(t, set.isequal(&expected_values, &values), fmt.tprintf("Expected:%v. Got:%v", expected_values, values))
-          tc.expect(t, len(keys) == set.size(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", set.size(&expected_keys), len(keys)))
-          tc.expect(t, len(kvs) == set.size(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", set.size(&expected_keys), len(kvs)))
+          tc.expect(t, len(expected_values) == len(values), fmt.tprintf("Expected:%v. Got:%v", len(expected_values), len(values)))
+          tc.expect(t, isEqualSlice(expected_values, values), fmt.tprintf("Expected:%v. Got:%v", expected_values, values))
+          tc.expect(t, len(keys) == len(expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(expected_keys), len(keys)))
+          tc.expect(t, len(kvs) == len(expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(expected_keys), len(kvs)))
         }
       }
       tc.expect(t, len(tracking_allocator.allocation_map) == num_allocs)
       {
         prefix := []int{45, 45, 116, 101, 115, 116}
         {
-          expected_values := set.fromArray([]int{0, 1, 2})
-          defer set.deleteSet(&expected_values)
+          expected_values := []int{0, 1, 2}
+          sort.quick_sort(expected_values)
           expected_keys := [][]int{{45, 45, 116, 101, 115, 116}, {45, 45, 116, 101, 115, 116, 49}, {45, 45, 116, 101, 115, 116, 50}}
-          values := set.fromArray(getAllValuesWithPrefix(&tr, prefix, context.temp_allocator))
-          defer set.deleteSet(&values)
+          values := getAllValuesWithPrefix(&tr, prefix, context.temp_allocator)
+          sort.quick_sort(values)
           keys := getAllKeysWithPrefix(&tr, prefix)
           defer {
             for k in keys {
@@ -332,7 +346,7 @@ test_getAllWithPrefix :: proc(t: ^testing.T) {
             }
             delete(kvs)
           }
-          tc.expect(t, set.isequal(&expected_values, &values), fmt.tprintf("Expected:%v. Got:%v", expected_values, values))
+          tc.expect(t, isEqualSlice(expected_values, values), fmt.tprintf("Expected:%v. Got:%v", expected_values, values))
           tc.expect(t, len(keys) == len(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(&expected_keys), len(keys)))
           tc.expect(t, len(kvs) == len(&expected_keys), fmt.tprintf("Expected:%v. Got:%v", len(&expected_keys), len(kvs)))
         }
