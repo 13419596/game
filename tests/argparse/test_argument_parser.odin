@@ -4,6 +4,7 @@ package test_argparse
 
 import "core:fmt"
 import "core:log"
+import "core:mem"
 import "core:runtime"
 import "core:testing"
 import "game:argparse"
@@ -41,6 +42,10 @@ test_addArgument :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, context.allocator)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
       defer deleteArgumentParser(&ap)
@@ -59,9 +64,15 @@ test_addArgument :: proc(t: ^testing.T) {
         tc.expect(t, !ok)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // test again, but with temp_allocator
       ap, ap_ok := makeArgumentParser(prog = "prog", description = "desc", epilog = "epilog", allocator = alloc)
+      defer deleteArgumentParser(&ap)
       {
         arg, ok := addArgument(&ap, {"-v", "--verbose"}, ArgumentAction.StoreTrue)
         tc.expect(t, ok)
@@ -72,6 +83,11 @@ test_addArgument :: proc(t: ^testing.T) {
         tc.expect(t, !ok)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 

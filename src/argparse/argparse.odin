@@ -52,7 +52,7 @@ makeArgumentParser :: proc(
   out = ArgumentParser {
     prog = {},
     description = clone(description, allocator),
-    epilog = clone(epilog),
+    epilog = clone(epilog, allocator),
     allow_abbrev = allow_abbrev,
     options = make(map[string]ArgumentOption, 0, allocator),
     _prefix_rune = prefix_rune,

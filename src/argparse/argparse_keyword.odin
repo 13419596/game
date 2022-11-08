@@ -423,6 +423,7 @@ _processKeywordOption :: proc(
     }
   case .Store:
     if s, s_ok := &state.data.(string); s_ok {
+      delete(s^, state._allocator)
       if trail, trail_ok := out.trailer.?; trail_ok {
         s^ = clone(trail, state._allocator)
         out.trailer = nil // consume trailer

@@ -4,6 +4,7 @@ package test_argparse
 
 import "core:fmt"
 import "core:log"
+import "core:mem"
 import "core:runtime"
 import "core:strings"
 import "core:testing"
@@ -28,30 +29,41 @@ test_makeOptionProcessingState :: proc(t: ^testing.T) {
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   num_tokens := []_NumTokens{_NumTokens{}, _NumTokens{0, nil}, _NumTokens{1, nil}}
   for alloc in allocs {
-    for nt in num_tokens {
-      for action in ArgumentAction {
-        state := _makeOptionProcessingState(action, nt, alloc)
-        switch data in &state.data {
-        case bool:
-        case int:
-        case string:
-          data = clone("asdf", alloc)
-        case [dynamic]string:
-          append(&data, clone("string data", alloc))
-          append(&data, clone("string data", alloc))
-          append(&data, clone("string data", alloc))
-        case [dynamic][dynamic]string:
-          vals := make([dynamic]string, 1, alloc)
-          vals[0] = clone("data00", alloc)
-          append(&data, vals)
-          vals = make([dynamic]string, 1, alloc)
-          vals[0] = clone("data11", alloc)
-          append(&data, vals)
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
+    {
+      for nt in num_tokens {
+        for action in ArgumentAction {
+          state := _makeOptionProcessingState(action, nt, alloc)
+          switch data in &state.data {
+          case bool:
+          case int:
+          case string:
+            data = clone("asdf", alloc)
+          case [dynamic]string:
+            append(&data, clone("string data", alloc))
+            append(&data, clone("string data", alloc))
+            append(&data, clone("string data", alloc))
+          case [dynamic][dynamic]string:
+            vals := make([dynamic]string, 1, alloc)
+            vals[0] = clone("data00", alloc)
+            append(&data, vals)
+            vals = make([dynamic]string, 1, alloc)
+            vals[0] = clone("data11", alloc)
+            append(&data, vals)
+          }
+          _deleteOptionProcessingState(&state)
+          tc.expect(t, state.data == nil)
         }
-        _deleteOptionProcessingState(&state)
-        tc.expect(t, state.data == nil)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -171,56 +183,67 @@ test_determineKeywordOption :: proc(t: ^testing.T) {
   }
 
   for alloc in allocs {
-    fixture_loop: for fixture, fixture_idx in &fixtures {
-      ap, ap_ok := makeArgumentParser(add_help = fixture.argparser_args.add_help, allocator = alloc)
-      defer deleteArgumentParser(&ap)
-      for arg_args in fixture.make_arg_args {
-        opt, opt_ok := addArgument(self = &ap, flags = arg_args.flags, action = arg_args.action)
-        tc.expect(t, opt_ok)
-        if !opt_ok {
-          continue fixture_loop
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
+    {
+      fixture_loop: for fixture, fixture_idx in &fixtures {
+        ap, ap_ok := makeArgumentParser(add_help = fixture.argparser_args.add_help, allocator = alloc)
+        defer deleteArgumentParser(&ap)
+        for arg_args in fixture.make_arg_args {
+          opt, opt_ok := addArgument(self = &ap, flags = arg_args.flags, action = arg_args.action)
+          tc.expect(t, opt_ok)
+          if !opt_ok {
+            continue fixture_loop
+          }
+        }
+        for test, test_idx in &fixture.tests {
+          out := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap._prefix_rune, equality_rune = ap._equality_rune)
+          tc.expect(
+            t,
+            test.expected.value == out.value,
+            fmt.tprintf("Test[%v][%v]: value: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.value, out.value),
+          )
+          tc.expect(
+            t,
+            (test.expected.trailer == out.trailer) || ((test.expected.trailer == nil) && (out.trailer == nil)),
+            fmt.tprintf("Test[%v][%v]: trailer: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.trailer, out.trailer),
+          )
+          tc.expect(
+            t,
+            (test.expected.is_unknown == out.is_unknown),
+            fmt.tprintf("Test[%v][%v]: is_unknown: Expected:%v; Got:%v", fixture_idx, test_idx, test.expected.is_unknown, out.is_unknown),
+          )
+          tc.expect(
+            t,
+            (test.expected.is_error == out.is_error),
+            fmt.tprintf("Test[%v][%v]: is_error: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.is_error, out.is_error),
+          )
+          tc.expect(
+            t,
+            test.expected.removed_equal_prefix == out.removed_equal_prefix,
+            fmt.tprintf(
+              "Test[%v][%v]: removed_equal_prefix: Expected:%v; Got:%v",
+              fixture_idx,
+              test_idx,
+              test.expected.removed_equal_prefix,
+              out.removed_equal_prefix,
+            ),
+          )
+          tc.expect(
+            t,
+            _isequal_FoundKeywordOption(&test.expected, &out),
+            fmt.tprintf("Test[%v][%v] input:%q:\nExpected:%v\nGot     :%v", fixture_idx, test_idx, test.input, test.expected, out),
+          )
         }
       }
-      for test, test_idx in &fixture.tests {
-        out := _determineKeywordOption(kw_trie = &ap._kw_trie, arg = test.input, prefix_rune = ap._prefix_rune, equality_rune = ap._equality_rune)
-        tc.expect(
-          t,
-          test.expected.value == out.value,
-          fmt.tprintf("Test[%v][%v]: value: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.value, out.value),
-        )
-        tc.expect(
-          t,
-          (test.expected.trailer == out.trailer) || ((test.expected.trailer == nil) && (out.trailer == nil)),
-          fmt.tprintf("Test[%v][%v]: trailer: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.trailer, out.trailer),
-        )
-        tc.expect(
-          t,
-          (test.expected.is_unknown == out.is_unknown),
-          fmt.tprintf("Test[%v][%v]: is_unknown: Expected:%v; Got:%v", fixture_idx, test_idx, test.expected.is_unknown, out.is_unknown),
-        )
-        tc.expect(
-          t,
-          (test.expected.is_error == out.is_error),
-          fmt.tprintf("Test[%v][%v]: is_error: Expected:%q; Got:%q", fixture_idx, test_idx, test.expected.is_error, out.is_error),
-        )
-        tc.expect(
-          t,
-          test.expected.removed_equal_prefix == out.removed_equal_prefix,
-          fmt.tprintf(
-            "Test[%v][%v]: removed_equal_prefix: Expected:%v; Got:%v",
-            fixture_idx,
-            test_idx,
-            test.expected.removed_equal_prefix,
-            out.removed_equal_prefix,
-          ),
-        )
-        tc.expect(
-          t,
-          _isequal_FoundKeywordOption(&test.expected, &out),
-          fmt.tprintf("Test[%v][%v] input:%q:\nExpected:%v\nGot     :%v", fixture_idx, test_idx, test.input, test.expected, out),
-        )
-      }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -256,6 +279,10 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -289,6 +316,11 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
         tc.expect(t, data_str^ == input_arg0)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -326,6 +358,11 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2, input_arg2}))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -370,6 +407,11 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2}))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -414,6 +456,11 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2, input_arg2}))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -457,6 +504,11 @@ test_processKeywordOption_Store :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg2, input_arg2}))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -465,6 +517,10 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -503,6 +559,11 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
         data_bool^ = false
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -511,6 +572,11 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = 2, action = .StoreTrue)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -520,6 +586,11 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -529,6 +600,11 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -538,6 +614,11 @@ test_processKeywordOption_StoreTrue :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -546,6 +627,10 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -583,6 +668,11 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
         data_bool^ = true
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -591,6 +681,11 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = 2, action = .StoreFalse)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -600,6 +695,11 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -609,6 +709,11 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -618,6 +723,11 @@ test_processKeywordOption_StoreFalse :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -626,6 +736,10 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -656,6 +770,11 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
         tc.expect(t, proc_out.num_consumed == 0)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -664,6 +783,11 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       option, opt_ok := addArgument(self = &ap, flags = {"-h", "--help"}, action = .Help, nargs = 2)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -673,6 +797,11 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -682,6 +811,11 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -691,6 +825,11 @@ test_processKeywordOption_Help :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -700,6 +839,10 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -730,6 +873,11 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
         tc.expect(t, proc_out.num_consumed == 0)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -738,6 +886,11 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       option, opt_ok := addArgument(self = &ap, flags = {"-h", "--help"}, action = .Version, nargs = 2)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -747,6 +900,11 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -756,6 +914,11 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -765,6 +928,11 @@ test_processKeywordOption_Version :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -773,6 +941,10 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -811,6 +983,11 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, data_strs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -848,6 +1025,11 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], []string{input_arg0, input_arg1, input_arg2, input_arg2}))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -894,6 +1076,11 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], expected2), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_strs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -940,6 +1127,11 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], expected2), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_strs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -985,6 +1177,11 @@ test_processKeywordOption_Extend :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], expected2), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_strs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -993,6 +1190,10 @@ test_processKeywordOption_Count :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1032,6 +1233,11 @@ test_processKeywordOption_Count :: proc(t: ^testing.T) {
         tc.expect(t, data_int^ == 4)
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1040,6 +1246,11 @@ test_processKeywordOption_Count :: proc(t: ^testing.T) {
       option, opt_ok := addArgument(self = &ap, flags = {"--a"}, nargs = 2, action = .Count)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1049,6 +1260,11 @@ test_processKeywordOption_Count :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1058,6 +1274,11 @@ test_processKeywordOption_Count :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1067,6 +1288,11 @@ test_processKeywordOption_Count :: proc(t: ^testing.T) {
       tc.expect(t, option == nil)
       tc.expect(t, !opt_ok)
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -1075,6 +1301,10 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
   using argparse
   allocs := []runtime.Allocator{context.allocator, context.temp_allocator}
   for alloc in allocs {
+    tracking_allocator := mem.Tracking_Allocator{}
+    mem.tracking_allocator_init(&tracking_allocator, alloc)
+    defer mem.tracking_allocator_destroy(&tracking_allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
     {
       // scalar
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1113,6 +1343,11 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, isequal_slice(data_strs^[:], expected), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, data_strs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // lower=2
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1141,17 +1376,37 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 2)
-        expected1 := [][dynamic]string{{input_arg0, input_arg1}}
+        expected1 := make([dynamic][dynamic]string) //{input_arg0, input_arg1}}
+        defer {
+          for ss in &expected1 {
+            delete(ss)
+          }
+          delete(expected1)
+        }
+        append(&expected1, make([dynamic]string))
+        append(&expected1[0], input_arg0)
+        append(&expected1[0], input_arg1)
         tc.expect(t, isequal_slice2(data_astrs^[:], expected1[:]), fmt.tprintf("\nExpected:%v\n    Out:%v", expected1, data_astrs^))
         // second confirms overwrite of state
         proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2, "extra", "extra33"})
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
-        expected2 := [][dynamic]string{{input_arg0, input_arg1}, {input_arg2, input_arg2}}
+        expected2 := [dynamic][dynamic]string{{input_arg0, input_arg1}, {input_arg2, input_arg2}}
+        defer {
+          for ss in &expected2 {
+            delete(ss)
+          }
+          delete(expected2)
+        }
         tc.expect(t, proc_out.num_consumed == 2)
         tc.expect(t, isequal_slice2(data_astrs^[:], expected2[:]), fmt.tprintf("\nExpected:%v\n    Out:%v", expected2, data_astrs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // ?
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1178,7 +1433,13 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 0)
-        expected := [][dynamic]string{{}, {input_trailer}}
+        expected := [dynamic][dynamic]string{{}, {input_trailer}}
+        defer {
+          for ss in &expected {
+            delete(ss)
+          }
+          delete(expected)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, data_astrs^))
       }
       {
@@ -1189,17 +1450,34 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 1)
-        expected1 := [][dynamic]string{{}, {input_trailer}, {input_arg0}}
+        expected1 := [dynamic][dynamic]string{{}, {input_trailer}, {input_arg0}}
+        defer {
+          for ss in &expected1 {
+            delete(ss)
+          }
+          delete(expected1)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected1[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected1, data_astrs^))
         // second confirms append of state
         proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2, "extra", "extra33"})
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 1)
-        expected2 := [][dynamic]string{{}, {input_trailer}, {input_arg0}, {input_arg2}}
+        expected2 := [dynamic][dynamic]string{{}, {input_trailer}, {input_arg0}, {input_arg2}}
+        defer {
+          for ss in &expected2 {
+            delete(ss)
+          }
+          delete(expected2)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected2[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_astrs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // *
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1218,7 +1496,13 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 0)
-        expected := [][dynamic]string{{}}
+        expected := [dynamic][dynamic]string{{}}
+        defer {
+          for ss in &expected {
+            delete(ss)
+          }
+          delete(expected)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, data_astrs^))
       }
       {
@@ -1226,7 +1510,13 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 0)
-        expected := [][dynamic]string{{}, {input_trailer}}
+        expected := [dynamic][dynamic]string{{}, {input_trailer}}
+        defer {
+          for ss in &expected {
+            delete(ss)
+          }
+          delete(expected)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, data_astrs^))
       }
       {
@@ -1237,17 +1527,34 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 3)
-        expected1 := [][dynamic]string{{}, {input_trailer}, {input_arg0, input_arg1, input_arg2}}
+        expected1 := [dynamic][dynamic]string{{}, {input_trailer}, {input_arg0, input_arg1, input_arg2}}
+        defer {
+          for ss in &expected1 {
+            delete(ss)
+          }
+          delete(expected1)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected1[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected1, data_astrs^))
         // second confirms append of state
         proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2})
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 2)
-        expected2 := [][dynamic]string{{}, {input_trailer}, {input_arg0, input_arg1, input_arg2}, {input_arg2, input_arg2}}
+        expected2 := [dynamic][dynamic]string{{}, {input_trailer}, {input_arg0, input_arg1, input_arg2}, {input_arg2, input_arg2}}
+        defer {
+          for ss in &expected2 {
+            delete(ss)
+          }
+          delete(expected2)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected2[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_astrs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       // +
       ap, ap_ok := makeArgumentParser(prog = "TEST", description = "description", epilog = "EPILOG", allocator = alloc, add_help = false)
@@ -1272,7 +1579,13 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 0)
-        expected := [][dynamic]string{{input_trailer}}
+        expected := [dynamic][dynamic]string{{input_trailer}}
+        defer {
+          for ss in &expected {
+            delete(ss)
+          }
+          delete(expected)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected, data_astrs^))
       }
       {
@@ -1284,15 +1597,32 @@ test_processKeywordOption_Append :: proc(t: ^testing.T) {
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 3)
         expected1 := [][dynamic]string{{input_trailer}, {input_arg0, input_arg1, input_arg2}}
+        defer {
+          for ss in &expected1 {
+            delete(ss)
+          }
+          delete(expected1)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected1[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected1, data_astrs^))
         // second confirms append of state
         proc_out, ok = _processKeywordOption(option, &proc_state, nil, {input_arg2, input_arg2})
         tc.expect(t, ok, "Expected okay")
         tc.expect(t, proc_out.trailer == nil)
         tc.expect(t, proc_out.num_consumed == 2)
-        expected2 := [][dynamic]string{{input_trailer}, {input_arg0, input_arg1, input_arg2}, {input_arg2, input_arg2}}
+        expected2 := [dynamic][dynamic]string{{input_trailer}, {input_arg0, input_arg1, input_arg2}, {input_arg2, input_arg2}}
+        defer {
+          for ss in &expected2 {
+            delete(ss)
+          }
+          delete(expected2)
+        }
         tc.expect(t, isequal_slice2(data_astrs^[:], expected2[:]), fmt.tprintf("\nExpected:%v\n     Got:%v", expected2, data_astrs^))
       }
     }
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
