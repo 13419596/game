@@ -58,7 +58,7 @@ reset :: proc(self: ^$S/Set($T)) {
 
 @(require_results)
 copy :: proc(self: ^$S/Set($T), allocator := context.allocator) -> Set(T) {
-  out := makeSet(T = T, allocator = context.allocator)
+  out := makeSet(T = T, allocator = allocator)
   reserve(&out.set, len(self.set))
   for item, val in self.set {
     out.set[item] = val
@@ -71,7 +71,7 @@ asArray :: proc(self: ^$S/Set($T), allocator := context.allocator, loc := #calle
   if self == nil {
     log.panicf("Received null pointer for self. self:%v", self)
   }
-  out := make([dynamic]T, 0, len(self.set), context.allocator, loc)
+  out := make([dynamic]T, 0, len(self.set), allocator, loc)
   for item, _ in self.set {
     append(&out, item)
   }

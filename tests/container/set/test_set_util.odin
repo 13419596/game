@@ -11,6 +11,7 @@ import rand "core:math/rand"
 import tc "tests:common"
 import container_set "game:container/set"
 
+@(private)
 areMapsKeysEqual :: proc(m1: ^$M1/map[$K]$V, m2: ^$M2/map[K]V) -> bool {
   if len(m1) != len(m2) {
     return false
@@ -28,16 +29,18 @@ areMapsKeysEqual :: proc(m1: ^$M1/map[$K]$V, m2: ^$M2/map[K]V) -> bool {
   return true
 }
 
-randomSetInt :: proc(N: Maybe(int) = nil, scale: f64 = 10.) -> container_set.Set(int) {
+@(private, require_results)
+randomSetInt :: proc(N: Maybe(int) = nil, scale: f64 = 10., allocator := context.allocator) -> container_set.Set(int) {
   using rand
   N := N.(int) or_else int(abs(exp_float64() * scale))
-  out := container_set.makeSet(int)
+  out := container_set.makeSet(T = int, allocator = allocator)
   for n in 0 ..< N {
     out.set[n] = {}
   }
   return out
 }
 
+@(private)
 areSortedListsEqual :: proc(arr: $A1/[]$T, expected: $A2/[]T) -> bool {
   expected := expected
   if len(arr) != len(expected) {
