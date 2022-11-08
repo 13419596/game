@@ -28,7 +28,11 @@ test_makeTrieNode :: proc(t: ^testing.T) {
       node := _makeTrieNode(int{}, int)
       tc.expect(t, &node != nil)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       node := _makeTrieNode(int{}, int)
       tc.expect(t, &node != nil)
@@ -36,6 +40,10 @@ test_makeTrieNode :: proc(t: ^testing.T) {
       _deleteTrieNode(&node)
       tc.expect(t, node.value == nil)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }

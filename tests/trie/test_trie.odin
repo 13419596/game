@@ -48,14 +48,22 @@ test_makeTrie :: proc(t: ^testing.T) {
       tr := makeTrie(int, int, context.temp_allocator)
       tc.expect(t, &tr != nil)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       tr := makeTrie(int, int)
       tc.expect(t, &tr != nil)
       tc.expect(t, 0 == getNumValues(&tr))
       deleteTrie(&tr)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -77,7 +85,11 @@ test_setValue :: proc(t: ^testing.T) {
       tc.expect(t, len(tr.root.children) == 1)
       tc.expect(t, 2 == getNumValues(&tr))
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       tr := makeTrie(uint, int)
       defer deleteTrie(&tr)
@@ -87,7 +99,11 @@ test_setValue :: proc(t: ^testing.T) {
       tc.expect(t, len(tr.root.children) == 1)
       tc.expect(t, 2 == getNumValues(&tr))
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
     {
       tr := makeTrie(int, int)
       defer deleteTrie(&tr)
@@ -101,7 +117,11 @@ test_setValue :: proc(t: ^testing.T) {
       setValue(&tr, arr[:], 400000)
       tc.expect(t, len(tr.root.children) == 1)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -130,7 +150,11 @@ test_discardItem :: proc(t: ^testing.T) {
       tc.expect(t, 1 == getNumValues(&tr))
       tc.expect(t, !discardItem(&tr, arr[:]))
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -168,7 +192,11 @@ test_hasKey :: proc(t: ^testing.T) {
       tc.expect(t, !hasKey(&tr, "abcd"))
       tc.expect(t, !hasKey(&tr, arr_abcdef[:len(arr_abcdef) - 2]))
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -213,7 +241,11 @@ test_getLongestPrefix :: proc(t: ^testing.T) {
         tc.expect(t, k == "abcde")
       }
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -273,7 +305,11 @@ test_getAllValues :: proc(t: ^testing.T) {
       }
       tc.expect(t, len(tracking_allocator.allocation_map) == num_allocs)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
 
@@ -381,6 +417,10 @@ test_getAllWithPrefix :: proc(t: ^testing.T) {
       }
       tc.expect(t, len(tracking_allocator.allocation_map) == num_allocs)
     }
-    tc.expect(t, len(tracking_allocator.allocation_map) == 0)
+    tc.expect(
+      t,
+      len(tracking_allocator.allocation_map) == 0,
+      fmt.tprintf("Expected no remaning allocations. Got: num:%v\n%v", len(tracking_allocator.allocation_map), tracking_allocator.allocation_map),
+    )
   }
 }
